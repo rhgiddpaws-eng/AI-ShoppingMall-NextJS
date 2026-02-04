@@ -1,0 +1,24 @@
+services:
+  ecommerceapp:
+    build:
+      context: ../../    # 프로젝트 루트 디렉토리를 가리키도록 상대 경로 수정
+      dockerfile: docker-compose/app/Dockerfile    # Dockerfile의 새로운 경로 지정
+    container_name: ecommerce-app
+    restart: always
+    env_file:
+      # .env.production 파일의 위치를 지정
+      # 이 파일에는 PORT=9100 같은 환경변수들이 들어있음
+      - ../../.env.production    
+    environment:
+      - PORT=9100  # nginx 설정에 맞춰 포트 변경
+    ports:
+      - "9100:9100"  # nginx 설정에 맞춰 포트 변경
+    networks:
+      # - yesnetwork
+      - yesnetwork  # yesnetwork 추가
+
+networks:
+  # yesnetwork:
+    # external: true
+  yesnetwork:
+    external: true
