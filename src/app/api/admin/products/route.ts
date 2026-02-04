@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import prismaClient from "@/lib/prismaClient"
+import { requireAdminSession } from "@/lib/requireAdminSession"
 import OpenAI from "openai"
 import pool from "@/lib/pgClient"
 import pgvector from "pgvector"
@@ -173,7 +174,8 @@ export interface CreateProductResponse {
 }
 
 export async function GET(request: Request) {
-  // URL에서 검색어와 카테고리 파라미터 추출
+  const auth = await requireAdminSession()
+  if (auth.error) return auth.error
   const { searchParams } = new URL(request.url)
   const search = searchParams.get("search")?.toLowerCase()
   const category = searchParams.get("category")
@@ -195,6 +197,8 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const auth = await requireAdminSession()
+  if (auth.error) return auth.error
   try {
     const productData = await request.json()
     

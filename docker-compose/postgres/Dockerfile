@@ -1,8 +1,8 @@
-FROM postgres:latest
+FROM postgres:17
 
 # 필요한 패키지 및 pgvector 설치
 RUN apt-get update && \
-    apt-get install -y postgresql-server-dev-all gcc make wget && \
+    apt-get install -y postgresql-server-dev-17 gcc make wget && \
     wget https://github.com/pgvector/pgvector/archive/refs/tags/v0.5.0.tar.gz && \
     tar -xzf v0.5.0.tar.gz && \
     cd pgvector-0.5.0 && \

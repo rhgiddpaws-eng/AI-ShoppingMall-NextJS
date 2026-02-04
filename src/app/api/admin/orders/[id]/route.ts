@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { requireAdminSession } from "@/lib/requireAdminSession"
 
 // 주문 상세 모킹 데이터
 interface OrderData {
@@ -88,6 +89,8 @@ export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const auth = await requireAdminSession()
+  if (auth.error) return auth.error
   const orderId = (await params).id
 
   // 해당 ID의 주문이 있는지 확인
@@ -101,8 +104,9 @@ export async function GET(
 export async function PUT(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
-  
 ) {
+  const auth = await requireAdminSession()
+  if (auth.error) return auth.error
   const orderId = (await params).id
 
   // 해당 ID의 주문이 있는지 확인

@@ -1,3 +1,7 @@
+# 깃헙 위치
+https://github.com/rhgiddpaws-eng/AI-ShoppingMall-NextJS.git
+
+
 # 배포 가이드: 옵션 A(EC2 + Docker) / 옵션 B(Vercel + Supabase)
 
 이 문서는 다음 두 가지 배포 옵션을 한 코드베이스에서 선택해 사용할 수 있도록 정리한 내용입니다.
@@ -121,6 +125,34 @@ sudo usermod -aG docker $USER
 
 ---
 
+### 2.3.1 ssl 설정
+
+```bash
+apt-get update
+apt-get install certbot python3-certbot-nginx
+certbot certonly --webroot -w /usr/share/nginx/html -d ecommerce.yes.monster --email milli@molluhub.com --agree-tos --no-eff-email
+```
+
+```bash
+root@d0d44d21e87a:/# certbot certonly --webroot -w /usr/share/nginx/html -d ecommerce.yes.monster --email milli@molluhub.com --agree-tos --no-eff-email
+Saving debug log to /var/log/letsencrypt/letsencrypt.log
+Requesting a certificate for ecommerce.yes.monster
+
+Successfully received certificate.
+Certificate is saved at: /etc/letsencrypt/live/ecommerce.yes.monster/fullchain.pem
+Key is saved at:         /etc/letsencrypt/live/ecommerce.yes.monster/privkey.pem
+This certificate expires on 2025-06-11.
+These files will be updated when the certificate renews.
+Certbot has set up a scheduled task to automatically renew this certificate in the background.
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+If you like Certbot, please consider supporting our work by:
+ * Donating to ISRG / Let's Encrypt:   https://letsencrypt.org/donate
+ * Donating to EFF:                    https://eff.org/donate-le
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+```
+
+
 ### 2.4 Let's Encrypt 인증서 발급 (nginx 기동 전에 한 번)
 
 nginx가 80 포트를 쓰기 전에, **80 포트로 certbot**을 사용해 인증서를 먼저 받습니다.
@@ -174,9 +206,67 @@ volumes:
 
 3. **DB 초기화·마이그레이션** (필요 시 프로젝트 루트에서)
 
-   - EC2에 Node/pnpm 설치되어 있다면:  
-     `DATABASE_URL=postgresql://postgres:비밀번호@localhost:7432/mydb?schema=public` 로 `npx prisma migrate deploy`
+   **Prisma 명령어 정리**
+
+   | 단계 | 명령어 | 설명 |
+   |------|--------|------|
+   | 1 | `npx prisma` | Prisma CLI 사용 (migrate, generate, studio 등) |
+   | 2 | `npx prisma init` | `prisma/schema.prisma`·`.env` 생성 (신규 프로젝트 시 한 번) |
+   | 3 | `npx prisma migrate dev --name init` | 스키마 정의 후, 로컬에서 마이그레이션 생성·적용 (개발용) |
+   | 4 | (compose/환경 변경 시) | `DATABASE_URL`을 docker-compose·배포 환경에 맞게 설정 후 `npx prisma migrate deploy` 실행 |
+   | 5 | `npx prisma studio` | DB GUI로 데이터 확인·편집 (브라우저에서 열림) |
+
+   **배포/EC2에서 마이그레이션 적용**
+
+   - EC2에 Node/pnpm 설치되어 있다면 (프로젝트 루트에서):
+     ```bash
+     DATABASE_URL="postgresql://postgres:비밀번호@localhost:7432/postgres?schema=public" npx prisma migrate deploy
+     ```
    - 또는 앱 컨테이너 안에서 마이그레이션 실행하도록 스크립트 구성 가능.
+
+   **DB 백업·복원**
+
+   | 구분 | 명령어 | 설명 |
+   |------|--------|------|
+   | 전체 백업 | 아래 참고 | 스키마 + 데이터 덤프 (재해 복구용) |
+   | 데이터만 백업 | 아래 참고 | 데이터만 덤프 (리셋 후 스키마 동일할 때 복원용) |
+   | 전체 복원 | 아래 참고 | 백업 파일로 DB 덮어쓰기 |
+   | 데이터만 복원 | 아래 참고 | 마이그레이션 적용 후, 데이터만 넣을 때 사용 |
+
+   **Docker Postgres 컨테이너 기준** (컨테이너 이름 `ecommerce_db`, DB명 `postgres`, 유저 `postgres`):
+
+   ```bash
+   # 전체 백업 (스키마 + 데이터)
+   docker exec ecommerce_db pg_dump -U postgres postgres > backup_$(date +%Y%m%d_%H%M%S).sql
+
+   # 데이터만 백업 (리셋 후 복원 시 스키마가 동일해야 함)
+   docker exec ecommerce_db pg_dump -U postgres -a --column-inserts postgres > backup_data_$(date +%Y%m%d_%H%M%S).sql
+
+   # 전체 복원 (기존 DB 내용이 덮어씌워짐) — 아래 파일명을 실제 백업 파일명으로 바꿀 것
+   docker exec -i ecommerce_db psql -U postgres postgres < backup_YYYYMMDD_HHMMSS.sql
+
+   # 데이터만 복원 (테이블은 이미 마이그레이션으로 존재할 때)
+   docker exec -i ecommerce_db psql -U postgres postgres < backup_data_YYYYMMDD_HHMMSS.sql
+   ```
+
+   **호스트에서 직접** (localhost:7432, `pg_dump`/`psql` 설치 필요):
+
+   ```bash
+   # 전체 백업
+   PGPASSWORD=postgres pg_dump -h localhost -p 7432 -U postgres postgres > backup_$(date +%Y%m%d_%H%M%S).sql
+
+   # 데이터만 백업
+   PGPASSWORD=postgres pg_dump -h localhost -p 7432 -U postgres -a --column-inserts postgres > backup_data_$(date +%Y%m%d_%H%M%S).sql
+
+   # 전체 복원 — 아래 파일명을 실제 백업 파일명으로 바꿀 것
+   PGPASSWORD=postgres psql -h localhost -p 7432 -U postgres postgres < backup_YYYYMMDD_HHMMSS.sql
+
+   # 데이터만 복원
+   PGPASSWORD=postgres psql -h localhost -p 7432 -U postgres postgres < backup_data_YYYYMMDD_HHMMSS.sql
+   ```
+
+   - `migrate reset` 전에 전체 백업을 해두면, 문제 시 복구용으로 사용할 수 있음.
+   - 리셋 후 **데이터만** 복원하려면, 리셋으로 적용된 스키마가 백업 시점과 동일해야 함.
 
 4. **앱 이미지 빌드 및 기동**
 
@@ -224,3 +314,8 @@ sudo crontab -e
 | 로컬 HTTP 테스트 | nginx 없이 앱만 띄워도 가능 | `pnpm dev` + Supabase URL |
 
 소스는 **1.1~1.3** 적용 후, 옵션에 따라 **환경 변수와 실행 방식**만 바꿔 주면 두 옵션을 모두 사용할 수 있습니다.
+
+---
+
+# 접속 가능한 Supabase 정보
+

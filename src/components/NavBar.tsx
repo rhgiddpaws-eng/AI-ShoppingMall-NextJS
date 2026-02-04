@@ -54,20 +54,24 @@ export function NavBar() {
             <Input type="search" placeholder="상품 검색..." className="pl-8 w-full" />
           </div>
           <ThemeToggle />
-          <Button variant="ghost" size="icon" asChild>
-            <Link href="/search">
+          <Button variant="ghost" size="icon" asChild className="text-foreground">
+            <Link href="/search" title="검색">
               <Search className="h-5 w-5 md:hidden" />
               <span className="sr-only">검색</span>
             </Link>
           </Button>
-          <Button variant="ghost" size="icon" asChild>
-            <Link href={user ? "/account" : "/login"}>
-              {user ? <User className="h-5 w-5" /> : <LogIn className="h-5 w-5" />}
-              <span className="sr-only">{user ? "계정" : "로그인"}</span>
+          <Button variant="ghost" size="sm" asChild className="text-foreground gap-1.5">
+            <Link
+              href={user ? "/account" : "/login"}
+              title={user ? "계정" : "로그인"}
+              aria-label={user ? "계정" : "로그인"}
+            >
+              {user ? <User className="h-5 w-5 shrink-0" /> : <LogIn className="h-5 w-5 shrink-0" />}
+              <span className="hidden sm:inline">{user ? "계정" : "로그인"}</span>
             </Link>
           </Button>
-          <Button variant="ghost" size="icon" className="relative" asChild>
-            <Link href="/wishlist">
+          <Button variant="ghost" size="icon" className="relative text-foreground" asChild>
+            <Link href="/wishlist" title="위시리스트">
               <Heart className="h-5 w-5" />
               {wishlist.length > 0 && (
                 <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs">
@@ -77,8 +81,8 @@ export function NavBar() {
               <span className="sr-only">위시리스트</span>
             </Link>
           </Button>
-          <Button variant="ghost" size="icon" className="relative" asChild>
-            <Link href="/cart">
+          <Button variant="ghost" size="icon" className="relative text-foreground" asChild>
+            <Link href="/cart" title="장바구니">
               <ShoppingCart className="h-5 w-5" />
               {cart.length > 0 && (
                 <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs">

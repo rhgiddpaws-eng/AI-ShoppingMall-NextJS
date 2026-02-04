@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { requireAdminSession } from "@/lib/requireAdminSession"
 
 // 주문 모킹 데이터
 const orders = [
@@ -68,7 +69,8 @@ const orders = [
 ]
 
 export async function GET(request: Request) {
-  // URL에서 검색어와 상태 파라미터 추출
+  const auth = await requireAdminSession()
+  if (auth.error) return auth.error
   const { searchParams } = new URL(request.url)
   const search = searchParams.get("search")?.toLowerCase()
   const status = searchParams.get("status")
@@ -90,6 +92,8 @@ export async function GET(request: Request) {
 }
 
 export async function PUT(request: Request) {
+  const auth = await requireAdminSession()
+  if (auth.error) return auth.error
   try {
     const { orderId, deliveryStatus } = await request.json()
 

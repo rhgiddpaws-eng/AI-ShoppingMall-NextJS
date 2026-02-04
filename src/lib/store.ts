@@ -119,6 +119,7 @@ export async function fetchLogin(email: string, password: string) {
     headers: {
       'Content-Type': 'application/json',
     },
+    credentials: 'include', // 로그인 응답의 Set-Cookie가 저장되고, 이후 /admin 요청 시 쿠키가 전달되도록
     body: JSON.stringify({ email, password }),
   })
   const data = (await response.json()) as LoginResponse

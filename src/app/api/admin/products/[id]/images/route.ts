@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server"
 import prismaClient from "@/lib/prismaClient"
+import { requireAdminSession } from "@/lib/requireAdminSession"
 
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const auth = await requireAdminSession()
+  if (auth.error) return auth.error
   try {
     const productId = (await params).id
     const { original, thumbnail } = await request.json()

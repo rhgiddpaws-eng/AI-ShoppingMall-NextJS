@@ -42,6 +42,7 @@ export default function WishlistItem({ item }: WishlistItemProps) {
           src={item.imageSrc || '/placeholder.svg'}
           alt={item.name}
           fill
+          sizes="96px"
           className="object-cover rounded-md"
         />
       </div>

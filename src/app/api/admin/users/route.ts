@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { requireAdminSession } from "@/lib/requireAdminSession"
 
 // 유저 모킹 데이터
 const users = [
@@ -68,7 +69,8 @@ const users = [
 ]
 
 export async function GET(request: Request) {
-  // URL에서 검색어 파라미터 추출
+  const auth = await requireAdminSession()
+  if (auth.error) return auth.error
   const { searchParams } = new URL(request.url)
   const search = searchParams.get("search")?.toLowerCase()
 

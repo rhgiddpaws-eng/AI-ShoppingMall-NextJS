@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { requireAdminSession } from "@/lib/requireAdminSession"
 
 // 상품 상세 모킹 데이터
 interface ProductData {
@@ -50,6 +51,8 @@ const productsData: { [key: string]: ProductData } = {
 }
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireAdminSession()
+  if (auth.error) return auth.error
   const productId = (await params).id
 
   // 새 상품 등록 페이지인 경우 빈 템플릿 반환
@@ -76,6 +79,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 }
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireAdminSession()
+  if (auth.error) return auth.error
   const productId = (await params).id
 
   // 해당 ID의 상품이 있는지 확인
@@ -100,6 +105,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 }
 
 export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireAdminSession()
+  if (auth.error) return auth.error
   const productId = (await params).id
 
   // 해당 ID의 상품이 있는지 확인

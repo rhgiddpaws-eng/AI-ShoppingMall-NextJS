@@ -1,0 +1,102 @@
+# package.json 주요 항목 설명
+
+## scripts (npm/pnpm 실행 명령)
+
+  dev           → 로컬 개발 서버 실행 (next dev)
+  build         → 프로덕션 빌드 (next build)
+  start         → 빌드된 앱 실행 (next start)
+  lint          → 코드 스타일/에러 검사 (next lint)
+  pathgen       → API 라우트 경로 자동 생성 (src/lib/apiRoutes.ts)
+  migrate       → DB 마이그레이션 개발 모드 (.env.host 사용, 호스트에서 실행)
+  migrate:reset → DB 리셋 후 마이그레이션 처음부터 적용 (데이터 삭제됨)
+  studio        → Prisma Studio 실행 (DB GUI, .env.host 사용)
+
+
+## dependencies (실제 서비스/앱에서 쓰는 패키지)
+
+  --- AWS ---
+  @aws-sdk/client-s3, @aws-sdk/s3-request-presigner
+    → S3 파일 업로드·다운로드, presigned URL 발급
+
+  --- 폼·유효성 ---
+  @hookform/resolvers  → react-hook-form과 zod 연동 (폼 검증)
+  react-hook-form      → 폼 상태·제출 처리
+  zod                  → 스키마 기반 검증 (입력값, API 응답 등)
+
+  --- DB·ORM ---
+  @prisma/client → Prisma 클라이언트 (DB 조회·저장)
+  pg, pgvector   → PostgreSQL 클라이언트, 벡터 확장 (raw 쿼리·AI 임베딩 검색)
+
+  --- UI (Radix 기반) ---
+  @radix-ui/* (accordion, alert-dialog, dialog, select, tabs, toast 등)
+    → 접근성 좋은 UI 컴포넌트 (드롭다운, 모달, 탭, 토스트 등)
+  class-variance-authority (cva), clsx, tailwind-merge
+    → 조건부 클래스·스타일 조합 (버튼 variant 등)
+
+  --- 기타 UI·애니메이션 ---
+  framer-motion        → 애니메이션
+  embla-carousel-react → 캐러셀(여러 이미지나 내용을 좌우로 슬라이드해서 넘길 수 있는 UI. 
+                         ex. 상품 이미지 슬라이더)
+  react-day-picker     → 날짜 선택 (캘린더)
+  lucide-react         → 아이콘
+  recharts             → 차트
+  sonner               → 토스트 알림
+  vaul                 → 바텀 시트(드로어) 컴포넌트. 바텀 시트란 모바일에서 자주 보이는, 
+                         화면 하단에서 위로 슬라이드되는 패널 UI를 말해요.
+                         (ex. 옵션 선택, 추가 정보 표시 등)
+  cmdk                 → 명령 팔레트(검색 UI, 커맨드 검색창. VSCode에서 Ctrl+P, Ctrl+Shift+P처럼,
+                         키보드로 빠르게 기능·페이지·명령을 검색/실행할 수 있게 해주는 UI)
+  input-otp             → OTP 입력 칸
+  react-lottie          → Lottie 애니메이션
+  react-resizable-panels → 패널 크기 조절
+
+  --- 상태·데이터 fetching ---
+  @tanstack/react-query → 서버에서 가져온 데이터를 클라이언트(브라우저)에서도 저장해두고,
+                         요청하면 자동으로 최신 데이터로 다시 받아와서 새로 고침 없이 화면에 반영해줍니다.
+                         (ex. 상품 목록, 상세 정보 등 fetch해서 캐시, useQuery로 쉽게 사용)
+  zustand               → 전역 상태 (장바구니 등, 가볍고 단순), zustand persist 와 함께 사용 좋음.
+
+  --- 인증·세션 ---
+  iron-session   → 쿠키 기반 세션 (로그인 유지)
+  argon2         → 비밀번호 해시 (암호화 저장)
+
+  --- API·유틸 ---
+  axios    → HTTP 요청
+  openai   → OpenAI API (챗봇, 임베딩 등)
+  lodash   → 배열·객체 유틸
+  date-fns → 날짜 포맷·계산
+  commander → CLI 옵션 파싱 (스크립트용)
+
+  --- 이미지·미디어 ---
+  sharp       → 이미지 리사이즈·변환 (서버)
+  mime-types  → 파일 MIME 타입 판별
+
+  --- 기타 ---
+  next, react, react-dom     → Next.js, React
+  next-themes                → 다크/라이트 테마
+  canvas-confetti            → 웹 화면에 축하/파티 분위기를 연출하는 '종이조각(컨페티) 날리기' 
+                               애니메이션을 구현해주는 라이브러리입니다. 
+                               (ex. 결제 성공, 이벤트 달성 시 화면에 색색의 종이들이 흩날리는 효과)
+  node-fetch                 → Node에서 HTTP 요청
+  puppeteer, puppeteer-extra, puppeteer-extra-plugin-stealth
+                             → 브라우저 자동화 (크롤링, 스크린샷 등)
+
+
+## devDependencies (개발·빌드 시에만 쓰는 패키지)
+
+  --- 빌드·스타일 ---
+  @tailwindcss/postcss, tailwindcss  → Tailwind CSS
+  tailwindcss-animate                → Tailwind 애니메이션 유틸
+  typescript                         → TypeScript
+
+  --- DB·마이그레이션 ---
+  prisma        → Prisma CLI (migrate, studio, generate)
+
+  --- 타입 정의 ---
+  @types/* (node, react, react-dom, pg, lodash, mime-types, canvas-confetti, react-lottie)
+                → TypeScript용 타입 선언 (JS 패키지 보강)
+
+  --- 개발 도구 ---
+  pathgen       → API 경로 자동 생성
+  tsx           → TypeScript 직접 실행
+  @tosspayments/tosspayments-sdk → 토스페이먼츠 연동 (개발/테스트용, 타입 등)

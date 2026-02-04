@@ -40,7 +40,7 @@ export default function CartItem({ item }: CartItemProps) {
   return (
     <div className="flex flex-col sm:flex-row items-start sm:items-center py-4 border-b">
       <div className="flex-shrink-0 w-full sm:w-24 h-24 relative mb-4 sm:mb-0 sm:mr-4">
-        <Image src={item.imageSrc || "/placeholder.svg"} alt={item.name} fill className="object-cover rounded-md" />
+        <Image src={item.imageSrc || "/placeholder.svg"} alt={item.name} fill sizes="96px" className="object-cover rounded-md" />
       </div>
 
       <div className="flex-grow">

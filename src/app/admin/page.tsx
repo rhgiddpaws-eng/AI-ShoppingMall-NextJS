@@ -16,9 +16,12 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    const isInitialLoad = dashboardData == null
+    if (isInitialLoad) setLoading(true)
+
     const fetchDashboardData = async () => {
       try {
-        const response = await fetch("/api/admin/dashboard")
+        const response = await fetch(`/api/admin/dashboard?period=${period}`)
         if (!response.ok) {
           throw new Error("데이터를 불러오는데 실패했습니다")
         }
@@ -32,7 +35,7 @@ export default function AdminDashboard() {
     }
 
     fetchDashboardData()
-  }, [])
+  }, [period])
 
   if (loading) {
     return (
@@ -91,7 +94,7 @@ export default function AdminDashboard() {
           <CardHeader>
             <CardTitle>매출 추이</CardTitle>
             <CardDescription>
-              <Tabs defaultValue={period} onValueChange={setPeriod}>
+              <Tabs value={period} onValueChange={(v) => setPeriod(v as "week" | "month" | "year")}>
                 <TabsList>
                   <TabsTrigger value="week">주간</TabsTrigger>
                   <TabsTrigger value="month">월간</TabsTrigger>
@@ -104,11 +107,17 @@ export default function AdminDashboard() {
             <div className="h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={dashboardData.salesData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis />
-                  <Tooltip formatter={(value) => [`${value.toLocaleString()}원`, "매출"]} />
-                  <Bar dataKey="매출" fill="hsl(var(--primary))" />
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis dataKey="name" className="text-xs" />
+                  <YAxis
+                    tickFormatter={(value) =>
+                      value >= 10000 ? `${(value / 10000).toFixed(0)}만` : value.toLocaleString()
+                    }
+                    className="text-xs"
+                    width={48}
+                  />
+                  <Tooltip formatter={(value) => [`${Number(value).toLocaleString()}원`, "매출"]} />
+                  <Bar dataKey="매출" fill="hsl(217 91% 60%)" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>

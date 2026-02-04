@@ -19,6 +19,7 @@ export default function Home() {
               src="/main/1.webp"
               alt="Summer Collection"
               fill
+              sizes="100vw"
               className="object-cover"
               priority
             />
@@ -58,6 +59,7 @@ export default function Home() {
                 src="/category/men.webp"
                 alt="남성"
                 fill
+                sizes="(max-width: 768px) 50vw, 25vw"
                 className="object-cover group-hover:scale-105 transition-transform duration-300"
               />
               <div className="absolute inset-0 bg-black/40 group-hover:bg-black/50 transition-colors flex items-center justify-center">
@@ -72,6 +74,7 @@ export default function Home() {
                 src="/category/women.webp"
                 alt="여성"
                 fill
+                sizes="(max-width: 768px) 50vw, 25vw"
                 className="object-cover group-hover:scale-105 transition-transform duration-300"
               />
               <div className="absolute inset-0 bg-black/40 group-hover:bg-black/50 transition-colors flex items-center justify-center">
@@ -86,6 +89,7 @@ export default function Home() {
                 src="/category/accessories.webp"
                 alt="액세서리"
                 fill
+                sizes="(max-width: 768px) 50vw, 25vw"
                 className="object-cover group-hover:scale-105 transition-transform duration-300"
               />
               <div className="absolute inset-0 bg-black/40 group-hover:bg-black/50 transition-colors flex items-center justify-center">
@@ -102,6 +106,7 @@ export default function Home() {
                 src="/category/shoes.webp"
                 alt="신발"
                 fill
+                sizes="(max-width: 768px) 50vw, 25vw"
                 className="object-cover group-hover:scale-105 transition-transform duration-300"
               />
               <div className="absolute inset-0 bg-black/40 group-hover:bg-black/50 transition-colors flex items-center justify-center">

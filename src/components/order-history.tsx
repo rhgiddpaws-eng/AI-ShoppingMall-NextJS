@@ -273,6 +273,7 @@ export function OrderHistory() {
                         src={`https://cdn.yes.monster/${item.product.imageSrc}` || '/placeholder.svg'}
                         alt={item.product.name}
                         fill
+                        sizes="64px"
                         className="object-cover"
                       />
                     </div>
@@ -386,6 +387,7 @@ export function OrderHistory() {
                   src={`https://cdn.yes.monster/${order.items[0].product.imageSrc}` || '/placeholder.svg'}
                   alt={order.items[0].product.name}
                   fill
+                  sizes="64px"
                   className="object-cover"
                 />
               </div>
