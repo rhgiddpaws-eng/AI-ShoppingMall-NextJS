@@ -16,17 +16,21 @@ datasource db {
 }
 
 model User {
-  id        Int      @id @default(autoincrement())
-  email     String   @unique
-  password  String? // 소셜 로그인인 경우 null 가능
-  name      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  role      UserRole @default(BUYER)
+  id                   Int       @id @default(autoincrement())
+  email                String    @unique
+  password             String?   // 소셜 로그인인 경우 null 가능
+  name                 String?
+  resetToken           String?   // 비밀번호 재설정 토큰
+  resetTokenExpiresAt  DateTime? // 토큰 만료 시각
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  role                 UserRole  @default(BUYER)
 
   // 관계
   orders    Order[]
   addresses Address[]
+  cart      Cart?
+  wishlist  Wishlist?
 }
 
 model Address {
@@ -40,6 +44,11 @@ model Address {
   updatedAt  DateTime @updatedAt
 }
 
+enum ProductStatus {
+  DRAFT
+  PUBLISHED
+}
+
 model Product {
   id           Int                    @id @default(autoincrement())
   name         String
@@ -48,14 +57,64 @@ model Product {
   stock        Int
   discountRate Float                  @default(0)
   category     Category?
+  status       ProductStatus          @default(PUBLISHED)
   // pgvector 확장을 사용한 벡터 임베딩 데이터 저장 (Prisma에서 직접 지원하지 않는 경우 Unsupported 사용)
   vector       Unsupported("vector")?
   createdAt    DateTime               @default(now())
   updatedAt    DateTime               @updatedAt
 
   // 관계
-  orderItems OrderItem[]
-  images     Image[]
+  orderItems    OrderItem[]
+  images        Image[]
+  cartItems     CartItem[]
+  wishlistItems WishlistEntry[]
+}
+
+// 로그인 사용자 장바구니 (서버 관리). /api/user/cart 에서 사용
+model Cart {
+  id        Int        @id @default(autoincrement())
+  userId    Int        @unique
+  user      User       @relation(fields: [userId], references: [id])
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  items CartItem[]
+}
+
+model CartItem {
+  id        Int      @id @default(autoincrement())
+  cartId    Int
+  cart      Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  productId Int
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  quantity  Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([cartId, productId])
+}
+
+// 로그인 사용자 위시리스트 (서버 관리). /api/user/wishlist 에서 사용
+model Wishlist {
+  id        Int             @id @default(autoincrement())
+  userId    Int             @unique
+  user      User            @relation(fields: [userId], references: [id])
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  items WishlistEntry[]
+}
+
+model WishlistEntry {
+  id         Int      @id @default(autoincrement())
+  wishlistId Int
+  wishlist   Wishlist @relation(fields: [wishlistId], references: [id], onDelete: Cascade)
+  productId  Int
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([wishlistId, productId])
 }
 
 model Image {
