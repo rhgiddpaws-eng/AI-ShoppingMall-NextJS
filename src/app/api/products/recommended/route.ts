@@ -1,13 +1,17 @@
+// =============================================================================
+// 추천 상품 API - GET /api/products/recommended
+// 쿼리: exclude(제외할 상품 ID) → 임베딩 기반 유사 상품 추천 목록 반환
+// =============================================================================
+
 import { NextResponse } from "next/server"
 import prismaClient from '@/lib/prismaClient'
+import { getCdnUrl } from '@/lib/cdn'
 import OpenAI from 'openai'
 import pgvector from 'pgvector'
 import pool from '@/lib/pgClient'
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 })
-
-const CDN_URL = "https://cdn.yes.monster/"
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
@@ -77,16 +81,13 @@ export async function GET(request: Request) {
     // 최종 결과 생성
     const result = similarProducts.rows.map(product => {
       const productWithImage = productsWithImages.find(p => p.id === product.id)
-      const imageSrc = productWithImage?.images?.[0]?.original 
-        ? `${CDN_URL}${productWithImage.images[0].original}` 
-        : "/placeholder.svg"
-      
+      const imageSrc = getCdnUrl(productWithImage?.images?.[0]?.original)
       return {
         id: product.id,
         name: product.name,
         price: product.price,
         category: product.category,
-        imageSrc: imageSrc
+        imageSrc,
       }
     })
     

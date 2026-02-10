@@ -1,3 +1,8 @@
+// =============================================================================
+// 상품 무한 스크롤 API - GET /api/products/infinite
+// 쿼리: category, page, pageSize, sort, order, term → 페이지별 상품 목록 + hasMore
+// =============================================================================
+
 import { NextRequest, NextResponse } from 'next/server'
 import prismaClient from '@/lib/prismaClient'
 import { Category, Product, Image } from '@prisma/client'
@@ -20,16 +25,20 @@ export async function GET(request: NextRequest) {
   const order = searchParams.get('order') || 'desc'
   const term = searchParams.get('term') || ''
 
+  const where = {
+    ...(category != null && { category: category as Category }),
+    ...(term && {
+      name: {
+        contains: term,
+        mode: 'insensitive',
+      },
+    }),
+  }
+
   try {
     const [products, total] = await Promise.all([
       prismaClient.product.findMany({
-        where: {
-          category: category as Category,
-          name: {
-            contains: term,
-            mode: 'insensitive',
-          },
-        },
+        where,
         skip: (page - 1) * pageSize,
         take: pageSize,
         include: {
@@ -40,13 +49,7 @@ export async function GET(request: NextRequest) {
         },
       }),
       prismaClient.product.count({
-        where: {
-          category: category as Category,
-          name: {
-            contains: term,
-            mode: 'insensitive',
-          },
-        },
+        where,
       }),
     ])
 

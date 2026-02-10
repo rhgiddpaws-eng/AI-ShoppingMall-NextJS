@@ -1,3 +1,8 @@
+// =============================================================================
+// 상품 목록 API - GET /api/products
+// 쿼리: category, limit, sort, order, term → 상품 목록(이미지 포함) 반환
+// =============================================================================
+
 import { NextRequest, NextResponse } from 'next/server'
 import prismaClient from '@/lib/prismaClient'
 import { Category, Product, Image } from '@prisma/client'
@@ -22,11 +27,13 @@ export async function GET(request: NextRequest) {
   try {
     const products = await prismaClient.product.findMany({
       where: {
-        category: category as Category,
-        name: {
-          contains: term,
-          mode: 'insensitive',
-        },
+        ...(category != null && { category: category as Category }),
+        ...(term && {
+          name: {
+            contains: term,
+            mode: 'insensitive',
+          },
+        }),
       },
       take: limit ? parseInt(limit) : undefined,
       include: {
