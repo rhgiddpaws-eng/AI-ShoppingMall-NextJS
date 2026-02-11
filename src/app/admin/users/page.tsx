@@ -1,4 +1,8 @@
 "use client"
+// =============================================================================
+// 관리자 유저 관리 - /admin/users
+// 사용자 검색, 유저 목록 테이블, 상세/권한 변경/비활성화 링크
+// =============================================================================
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
@@ -21,6 +25,7 @@ interface User {
   role: string;
 }
 
+/** 유저 관리: 검색어로 /api/admin/users 조회, 목록 표시 및 상세(/admin/users/[id]) 링크 */
 export default function UsersPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [users, setUsers] = useState<User[]>([])

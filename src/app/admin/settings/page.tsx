@@ -1,8 +1,13 @@
 "use client"
+// =============================================================================
+// 관리자 설정 - /admin/settings
+// 사이트·관리자 관련 설정 UI (추후 알림·권한·시스템 설정 확장 예정)
+// =============================================================================
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Settings } from "lucide-react"
 
+/** 관리자 설정: 현재 안내 문구만 표시, 추후 설정 옵션 추가 예정 */
 export default function AdminSettingsPage() {
   return (
     <div>

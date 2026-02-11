@@ -1,4 +1,8 @@
 'use client'
+// =============================================================================
+// 마이페이지 (계정) - /account
+// 로그인한 사용자의 프로필, 주문 내역, 결제 정보, 설정 탭 제공
+// =============================================================================
 
 import type React from 'react'
 
@@ -14,7 +18,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useAuthStore } from '@/lib/store'
 import { toast } from 'sonner'
 import { OrderHistory } from '@/components/order-history'
+import { InquiryHistory } from '@/components/inquiry-history'
 
+/** 마이페이지: 프로필 수정, 주문 내역, 결제 정보, 설정 탭 + 로그아웃 */
 export default function AccountPage() {
   const router = useRouter()
   const { user, logout, isHydrated } = useAuthStore()
@@ -68,12 +74,14 @@ export default function AccountPage() {
       </div>
 
       <Tabs defaultValue="profile">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="profile">프로필</TabsTrigger>
           <TabsTrigger value="orders">주문 내역</TabsTrigger>
+          <TabsTrigger value="inquiries">문의 내역</TabsTrigger>
           <TabsTrigger value="payments">결제 정보</TabsTrigger>
           <TabsTrigger value="settings">설정</TabsTrigger>
         </TabsList>
+        {/* 프로필 탭 */}
         <TabsContent value="profile" className="mt-6">
           <form onSubmit={handleUpdateProfile} className="space-y-6">
             <div className="space-y-2">
@@ -96,14 +104,22 @@ export default function AccountPage() {
             <Button type="submit">프로필 업데이트</Button>
           </form>
         </TabsContent>
+        {/* 주문 내역 탭 */}
         <TabsContent value="orders" className="mt-6">
           <h2 className="text-xl font-semibold mb-4">주문 내역</h2>
           <OrderHistory />
         </TabsContent>
+        {/* 문의 내역 탭 */}
+        <TabsContent value="inquiries" className="mt-6">
+          <h2 className="text-xl font-semibold mb-4">문의 내역</h2>
+          <InquiryHistory />
+        </TabsContent>
+        {/* 결제 정보 탭 */}
         <TabsContent value="payments" className="mt-6">
           <h2 className="text-xl font-semibold mb-4">결제 정보</h2>
           <p className="text-muted-foreground">저장된 결제 정보가 없습니다.</p>
         </TabsContent>
+        {/* 계정 설정 탭 */}
         <TabsContent value="settings" className="mt-6">
           <h2 className="text-xl font-semibold mb-4">계정 설정</h2>
           <div className="space-y-4">

@@ -1,3 +1,8 @@
+// =============================================================================
+// 로그인 API - POST /api/login
+// 이메일·비밀번호 검증, DB 사용자 조회·비밀번호 확인, 세션 생성 후 사용자 정보 반환
+// =============================================================================
+
 import { getSession } from '@/lib/ironSessionControl'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
@@ -11,6 +16,7 @@ export type LoginResponse = {
     id: number
     name?: string
     email: string
+    role?: string
   }
 }
 
@@ -60,11 +66,11 @@ export async function POST(request: Request) {
       )
     }
 
-    // 세션 업데이트
+    // 세션 업데이트 (role은 반드시 문자열로 저장해 쿠키 직렬화 시 누락 방지)
     session.id = user.id
     session.email = user.email
     session.name = user.name ?? undefined
-    session.role = user.role
+    session.role = String(user.role)
     session.isLoggedIn = true
     await session.save()
 
@@ -75,6 +81,7 @@ export async function POST(request: Request) {
         id: user.id,
         name: user.name ?? undefined,
         email: user.email,
+        role: String(user.role),
       },
     })
   } catch (error) {

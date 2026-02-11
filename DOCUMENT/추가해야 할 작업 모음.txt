@@ -1,5 +1,7 @@
-1. 현재 장바구니 기능이 로컬에서 관리되고 있다.
-   다른 항목처럼 DB에 테이블을 추가하고 서버에서 관리되게 수정.
+1. [완료] 현재 장바구니 기능이 로컬에서 관리되고 있다.
+   → DB에 Cart/CartItem, Wishlist/WishlistEntry 테이블 추가 및 서버 API(/api/user/cart, /api/user/wishlist)로 관리되게 수정 완료.
+   - 로그인 사용자: 서버에서 조회·갱신. 비로그인: localStorage(persist) 유지.
+   - ERD 참고 (구현됨):
 
 ┌───────────────┐       
 │   Cart         │      
@@ -21,6 +23,7 @@
 │ createdAt     │
 │ updatedAt     │
 └───────────────┘
+-------------------------------적용 완료---------------------------------
 
 2. 현재 결제가 토스페이먼츠로 되어 있는데 portone으로 교체.
 
@@ -31,7 +34,7 @@
 
 4. **기타**
    - 애널리틱스: Google Analytics, Amplitude 등 추후 연동 가능
-   - 이메일/알림: SendGrid, Nodemailer 등 추후 연동 가능
+   - 이메일/알림: SendGrid, Nodemailer 등 추후 연동 가능 -> AWS SES
 
 5. 메인 쪽 기능 추가
     1. **리뷰/평점 시스템**  

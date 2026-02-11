@@ -27,6 +27,7 @@ export async function GET(request: NextRequest) {
   try {
     const products = await prismaClient.product.findMany({
       where: {
+        status: "PUBLISHED" as const,
         ...(category != null && { category: category as Category }),
         ...(term && {
           name: {

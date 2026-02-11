@@ -1,5 +1,35 @@
 "use client"
 
+/**
+ * NavBar — 전역 상단 네비게이션
+ *
+ * [모양]
+ * - 한 줄: [모바일 메뉴] 로고 | 카테고리 링크(남/여/액세서리/신발/세일) | 검색 | 테마 | 로그인/계정 | 위시리스트 | 장바구니
+ * - md 미만: 카테고리 숨김, 검색은 아이콘만(/search 링크)
+ * - md 이상: 검색 Input 표시, 카테고리 링크 표시
+ * - 위시/장바구니에 개수 Badge (absolute -top-1 -right-1), 0이면 Badge 미표시
+ * - 로고: /logo.svg, 다크모드 시 dark:invert
+ *
+ * [기능]
+ * - 로고 클릭 → /
+ * - 카테고리 → /category/men|women|accessories|shoes, 세일 → /category/sale
+ * - 검색(데스크톱): Input만 있고 실검색 기능은 연동되어 있지 않음(placeholder)
+ * - 검색(모바일): /search로 이동만 하며 실검색 로직 미구현
+ * - 로그인 여부에 따라 /login 또는 /account, 아이콘 User/LogIn 전환
+ * - 위시리스트/장바구니 개수는 useShopStore.cart, wishlist 길이
+ *
+ * [문법]
+ * - Button asChild + Link: 링크처럼 동작하는 버튼(Next 라우팅)
+ * - aria-label, title, sr-only으로 접근성
+ *
+ * [라이브러리 연계]
+ * - next/link, next/image
+ * - lucide-react: ShoppingCart, Search, User, Heart, Menu, LogIn
+ * - @/components/ui: Button, Input, Badge
+ * - @/components/theme-toggle: ThemeToggle
+ * - @/lib/store: useShopStore(cart, wishlist), useAuthStore(user)
+ */
+
 import Link from "next/link"
 import Image from "next/image"
 import { ShoppingCart, Search, User, Heart, Menu, LogIn } from "lucide-react"

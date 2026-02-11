@@ -22,10 +22,11 @@ export async function GET(request: Request) {
   }
 
   try {
-    // 현재 상품 정보 가져오기
-    const product = await prismaClient.product.findUnique({
+    // 현재 상품 정보 가져오기 (쇼핑몰에는 PUBLISHED만 노출)
+    const product = await prismaClient.product.findFirst({
       where: {
         id: parseInt(excludeId),
+        status: "PUBLISHED",
       },
     })
 
@@ -67,9 +68,8 @@ export async function GET(request: Request) {
     
     const productsWithImages = await prismaClient.product.findMany({
       where: {
-        id: {
-          in: productIds
-        }
+        id: { in: productIds },
+        status: "PUBLISHED",
       },
       include: {
         images: {

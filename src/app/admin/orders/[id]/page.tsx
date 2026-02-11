@@ -1,4 +1,8 @@
 "use client"
+// =============================================================================
+// 관리자 주문 상세 - /admin/orders/[id]
+// 주문 정보·상품·고객·배송지, 배송 상태 변경(PUT /api/admin/orders/[id])
+// =============================================================================
 
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
@@ -37,6 +41,7 @@ interface Order {
   customer: Customer;
 }
 
+/** 주문 상세: ID로 API 조회 후 정보·상품·고객·배송지·배송 상태 변경 폼 표시 */
 export default function OrderDetailPage() {
   const params = useParams()
   const router = useRouter()

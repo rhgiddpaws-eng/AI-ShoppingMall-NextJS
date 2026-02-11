@@ -1,3 +1,8 @@
+// =============================================================================
+// 관리자 유저 API - GET /api/admin/users
+// 쿼리: search → 사용자 목록 반환 (관리자 전용)
+// =============================================================================
+
 import { NextResponse } from "next/server"
 import { requireAdminSession } from "@/lib/requireAdminSession"
 
@@ -70,7 +75,7 @@ const users = [
 
 export async function GET(request: Request) {
   const auth = await requireAdminSession()
-  if (auth.error) return auth.error
+  if ("error" in auth) return auth.error
   const { searchParams } = new URL(request.url)
   const search = searchParams.get("search")?.toLowerCase()
 

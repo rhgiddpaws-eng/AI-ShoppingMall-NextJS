@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { BarChart3, Users, ShoppingBag, Package, Settings, LogOut } from "lucide-react"
+import { BarChart3, Users, ShoppingBag, Package, MessageCircle, Settings, LogOut } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -27,6 +27,11 @@ const sidebarItems = [
     title: "주문 관리",
     href: "/admin/orders",
     icon: <ShoppingBag className="h-5 w-5" />,
+  },
+  {
+    title: "문의 관리",
+    href: "/admin/inquiries",
+    icon: <MessageCircle className="h-5 w-5" />,
   },
   {
     title: "설정",

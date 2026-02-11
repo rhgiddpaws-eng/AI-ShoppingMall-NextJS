@@ -1,4 +1,16 @@
-// 위시리스트 타입 정의
+/**
+ * wishlist - 위시리스트 로직 (localStorage 기반)
+ *
+ * [기능]
+ * - 위시리스트 추가/삭제/조회/포함 여부/비우기
+ * - 브라우저 localStorage 키 "wishlist"에 JSON 배열로 저장
+ *
+ * [문법]
+ * - typeof window === "undefined": SSR 환경에서 window 접근 방지
+ * - Array.prototype.some(): id 일치하는 항목 존재 여부
+ */
+
+/** 위시리스트 한 줄 아이템 타입. 장바구니와 달리 quantity 없음 */
 export interface WishlistItem {
   id: string
   name: string
@@ -8,7 +20,12 @@ export interface WishlistItem {
   salePrice?: number
 }
 
-// 위시리스트 아이템 추가
+/**
+   * WishlistItem 인터페이스는 많이 쓰지만 ( api )
+   * 로컬스토리지에 저장하고 불러오는 아래 함수는 사용 안함.
+   */
+  
+/** 위시리스트에 상품 추가. 이미 있으면 무시 */
 export function addToWishlist(product: WishlistItem) {
   if (typeof window === "undefined") return
 
@@ -23,7 +40,7 @@ export function addToWishlist(product: WishlistItem) {
   return wishlist
 }
 
-// 위시리스트 아이템 삭제
+/** id에 해당하는 위시리스트 아이템 삭제 */
 export function removeFromWishlist(id: string) {
   if (typeof window === "undefined") return
 
@@ -34,7 +51,7 @@ export function removeFromWishlist(id: string) {
   return updatedWishlist
 }
 
-// 위시리스트 가져오기
+/** localStorage에서 위시리스트 배열 읽기. 없거나 SSR이면 빈 배열 */
 export function getWishlist(): WishlistItem[] {
   if (typeof window === "undefined") return []
 
@@ -42,7 +59,7 @@ export function getWishlist(): WishlistItem[] {
   return wishlistData ? JSON.parse(wishlistData) : []
 }
 
-// 위시리스트에 있는지 확인
+/** id가 위시리스트에 포함되어 있는지 여부 */
 export function isInWishlist(id: string): boolean {
   if (typeof window === "undefined") return false
 
@@ -50,11 +67,10 @@ export function isInWishlist(id: string): boolean {
   return wishlist.some((item) => item.id === id)
 }
 
-// 위시리스트 비우기
+/** 위시리스트 전체 비우기 */
 export function clearWishlist() {
   if (typeof window === "undefined") return
 
   localStorage.setItem("wishlist", JSON.stringify([]))
   return []
 }
-

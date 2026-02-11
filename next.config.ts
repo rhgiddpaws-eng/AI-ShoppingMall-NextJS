@@ -1,12 +1,38 @@
 import type { NextConfig } from 'next'
+import * as fs from 'fs'
+import * as path from 'path'
+
+// next.config 로드 시점에 .env를 명시적으로 읽어 remotePatterns hostname이 올바르게 설정되도록 함
+function loadCdnUrlFromEnv(): string {
+  const env = process.env.NEXT_PUBLIC_AWS_BUCKET_CDN
+  if (env) return env
+  try {
+    const envPath = path.join(process.cwd(), '.env')
+    if (fs.existsSync(envPath)) {
+      const content = fs.readFileSync(envPath, 'utf8')
+      const m = content.match(/NEXT_PUBLIC_AWS_BUCKET_CDN=(.+)/)
+      if (m) return m[1].trim().replace(/^["']|["']$/g, '')
+    }
+  } catch (_) {}
+  return 'https://cdn.ncott.shop'
+}
+
+const cdnUrl = loadCdnUrlFromEnv()
+const cdnHostname = (() => {
+  try {
+    return new URL(cdnUrl).hostname
+  } catch {
+    return 'cdn.ncott.shop'
+  }
+})()
 
 const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: 'cdn.yes.monster',
-        pathname: '/ecommerce/products/**',
+        hostname: cdnHostname,
+        pathname: '/**',
       },
     ],
   },

@@ -1,3 +1,8 @@
+// =============================================================================
+// 상품 상세 API - GET /api/products/[id]
+// 상품 ID로 단일 상품 조회(이미지 포함), 없으면 404
+// =============================================================================
+
 import { type NextRequest, NextResponse } from "next/server"
 import prismaClient from "@/lib/prismaClient"
 
@@ -14,8 +19,8 @@ export async function GET(
       return NextResponse.json({ error: "유효하지 않은 상품 ID입니다" }, { status: 400 })
     }
 
-    const product = await prismaClient.product.findUnique({
-      where: { id },
+    const product = await prismaClient.product.findFirst({
+      where: { id, status: "PUBLISHED" },
       include: {
         images: true,
       }

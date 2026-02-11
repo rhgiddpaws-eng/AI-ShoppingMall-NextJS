@@ -25,8 +25,11 @@ export async function GET(request: NextRequest) {
   const order = searchParams.get('order') || 'desc'
   const term = searchParams.get('term') || ''
 
+  // slug "new" → 카테고리 필터 없이 "최신순 전체" (DB에 category=NEW인 상품이 없을 수 있음)
+  const isNewCategory = category === 'NEW'
   const where = {
-    ...(category != null && { category: category as Category }),
+    status: "PUBLISHED" as const,
+    ...(category != null && !isNewCategory && { category: category as Category }),
     ...(term && {
       name: {
         contains: term,
@@ -68,8 +71,14 @@ export async function GET(request: NextRequest) {
     //   inStock: Math.random() > 0.2,
     // }))
 
+    // 이미지 순서 고정 (id 오름차순) → 프론트 images[0]이 항상 동일
+    const productsWithOrderedImages = products.map(p => ({
+      ...p,
+      images: [...p.images].sort((a, b) => a.id - b.id),
+    }))
+
     return NextResponse.json({
-      products,
+      products: productsWithOrderedImages,
       total,
       hasMore: page * pageSize < total,
     })

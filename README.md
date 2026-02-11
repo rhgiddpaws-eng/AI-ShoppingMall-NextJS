@@ -46,15 +46,14 @@
    - pgvector를 활용하여 유사도 검색된 상품을 함께 노출
    - 상품 임베딩을 통해 연관성 높은 상품부터 순서대로 추천
 3. **장바구니 담기 / 바로 구매**
-   - **(프론트엔드 구현) 장바구니에 추가**할 수 있는 버튼
+   - 장바구니에 추가 버튼 (로그인 시 서버 반영, 비로그인 시 로컬 저장)
    - 바로 구매 시 주문 페이지로 이동
 
 ## 2.3 장바구니 및 주문 기능
-1. **장바구니 (프론트엔드 구현)**
-   - **프론트엔드(예: 브라우저 Local Storage, Redux 등)에서 장바구니 상태 관리**
-   - 상품 추가/삭제/수량 변경
-   - 장바구니 내 총 금액 표시
-   - 유저가 새로고침하거나 다른 페이지로 이동해도 장바구니 정보가 유지될 수 있도록 클라이언트 저장 전략 적용
+1. **장바구니 및 위시리스트**
+   - **로그인 사용자**: DB(서버)에서 관리. GET/POST/PATCH/DELETE `/api/user/cart`, `/api/user/wishlist` 로 조회·추가·수정·삭제. 클라이언트는 서버 응답으로 스토어(Zustand) 갱신 후 로컬 캐시로 사용.
+   - **비로그인 사용자**: 브라우저 localStorage(persist)에서만 관리. 로그인 시 서버 장바구니/위시리스트로 전환됨.
+   - 상품 추가/삭제/수량 변경, 장바구니 내 총 금액 표시.
 2. **주문 페이지**
    - 프론트엔드 장바구니 데이터를 기반으로 주문을 생성
    - 배송 정보(수령인, 주소, 연락처) 입력
@@ -146,7 +145,7 @@
 
 # 3. 데이터 모델
 
-장바구니가 프론트엔드에서 관리되므로, **Cart**와 **CartItem** 테이블은 MVP 단계에서 **사용하지 않거나(선택 사항)** 추후 확장 기능을 위해 남겨둘 수 있습니다. 최소한 주문 생성( Order, OrderItem ), 결제( Payment ) 관련 부분은 백엔드 DB로 관리합니다.
+**Cart / CartItem / Wishlist / WishlistEntry** 는 로그인 사용자의 장바구니·위시리스트를 서버(DB)에서 관리할 때 사용합니다. 주문( Order, OrderItem ), 결제( Payment )와 함께 백엔드 DB로 관리합니다.
 
 ```
 ┌───────────────┐       ┌───────────────┐
@@ -161,8 +160,27 @@
 └───────────────┘       │ createdAt     │
                          │ updatedAt     │
                          └───────────────┘
-                                
-(장바구니를 프론트엔드에서 관리하므로 Cart / CartItem 테이블은 MVP 범위에서 사용하지 않을 수 있음)
+                         
+┌───────────────┐       ┌───────────────┐
+│   Cart         │       │  CartItem      │
+│───────────────│       │───────────────│
+│ id (PK)       │       │ id (PK)       │
+│ userId (FK)   │───┐   │ cartId (FK)   │
+│ createdAt     │   │   │ productId (FK)│
+│ updatedAt     │   └───│ quantity      │
+└───────────────┘       │ createdAt     │
+                        │ updatedAt     │
+                        └───────────────┘
+
+┌───────────────┐       ┌───────────────┐
+│   Wishlist     │       │ WishlistEntry  │
+│───────────────│       │───────────────│
+│ id (PK)       │       │ id (PK)       │
+│ userId (FK)   │───┐   │ wishlistId(FK)│
+│ createdAt     │   └───│ productId (FK)│
+│ updatedAt     │       │ createdAt     │
+└───────────────┘       │ updatedAt     │
+                        └───────────────┘
 
 ┌───────────────┐       ┌───────────────┐        ┌────────────────┐
 │   Order        │       │  OrderItem    │        │   Payment       │
@@ -195,20 +213,24 @@
    - `vector`: 상품 임베딩 데이터(pgvector) 저장 컬럼
    - `createdAt`, `updatedAt`
 
-3. **(사용하지 않을 수 있음) Cart / CartItem**
-   - MVP 단계에서는 프론트엔드에서만 장바구니를 관리하므로, 백엔드에 테이블이 꼭 필요하지 않을 수 있습니다.
-   - 추후 여러 디바이스 간 장바구니 동기화나 데이터 분석을 위해 필요하다면, 아래 스키마를 재활용 가능합니다:
-     - `Cart` 테이블: `id`, `userId`, `createdAt`, `updatedAt`
-     - `CartItem` 테이블: `id`, `cartId`, `productId`, `quantity`, `createdAt`, `updatedAt`
+3. **Cart / CartItem (로그인 사용자 장바구니, 서버 관리)**
+   - `Cart`: `id`, `userId`(unique), `createdAt`, `updatedAt`. 사용자당 1개.
+   - `CartItem`: `id`, `cartId`, `productId`, `quantity`, `createdAt`, `updatedAt`. (cartId, productId) unique.
+   - `/api/user/cart` 에서 조회·추가·수량 변경·삭제.
 
-4. **Order**
+4. **Wishlist / WishlistEntry (로그인 사용자 위시리스트, 서버 관리)**
+   - `Wishlist`: `id`, `userId`(unique), `createdAt`, `updatedAt`. 사용자당 1개.
+   - `WishlistEntry`: `id`, `wishlistId`, `productId`, `createdAt`, `updatedAt`. (wishlistId, productId) unique.
+   - `/api/user/wishlist` 에서 조회·추가·삭제.
+
+5. **Order**
    - `id`: Primary Key
    - `userId`: 주문을 진행한 사용자
    - `totalAmount`: 총 결제 금액
    - `status`: 주문 상태(예: `PENDING`, `PAID`, `CANCELED` 등)
    - `createdAt`, `updatedAt`
 
-5. **OrderItem**
+6. **OrderItem**
    - `id`: Primary Key
    - `orderId`: Order 테이블과 N:1 관계
    - `productId`: Product 테이블과 N:1 관계
@@ -216,7 +238,7 @@
    - `price`: 구매 당시 상품 가격(변동 가격 고려 시 보존)
    - `createdAt`, `updatedAt`
 
-6. **Payment**
+7. **Payment**
    - `id`: Primary Key
    - `orderId`: Order 테이블과 1:1 관계
    - `paymentMethod`: 결제 방식(토스페이먼츠, 카드, 가상계좌 등)
@@ -235,7 +257,7 @@
    - Tailwind CSS / Styled Components / Emotion 등 스타일링 라이브러리
    - React Hook Form(폼 처리), Headless UI(모달/셀렉트 등) 활용 가능
    - 다크모드 지원(Next-themes 등 라이브러리 고려)
-   - **장바구니 기능을 Local Storage, Redux, Recoil 등에서 관리**
+   - **장바구니/위시리스트**: 로그인 시 서버(DB) 연동, 비로그인 시 Local Storage(Zustand persist)로 관리
 
 2. **백엔드**
    - **Node.js** + **Next.js API Routes** (필요 시 서버리스 아키텍처로 확장)
@@ -262,7 +284,7 @@
 1. **홈페이지 및 네비게이션**: 카테고리/검색 기능, 다크모드, 반응형 UI
 2. **상품 상세 페이지**: 이미지, 가격, 설명, 재고 상태, **프론트엔드 장바구니 담기**, **pgvector 기반 추천**
 3. **장바구니 및 주문**: 
-   - **프론트엔드 장바구니**(Local Storage or Redux 등) CRUD
+   - **장바구니/위시리스트**: 로그인 사용자는 서버(DB) CRUD, 비로그인은 로컬(persist) CRUD
    - 주문 작성, 배송 정보 입력
 4. **결제 시스템**: **토스페이먼츠** 연동, 결제 성공/실패 여부 처리, **웹훅** 기반 상태 업데이트
 5. **사용자 인증**: 이메일/비밀번호 로그인, 기본 프로필 관리
@@ -297,3 +319,8 @@
   - **고급 분석**: 날짜/상품별 매출 추이, 전환율, 환불률, 방문 트래픽 분석 등  
   - **다양한 필터/정렬**: 여러 조건 조합으로 주문/유저/상품 등을 세밀하게 필터링  
   - **권한 관리**: 관리자/CS 직원 등 역할별로 접근 권한을 세분화  
+
+
+
+## 6.1 벡터값 넣기
+- prisma client 가 제공하는 로우쿼리를 이용해야 백터값을 db에 업데이트 할수 있음

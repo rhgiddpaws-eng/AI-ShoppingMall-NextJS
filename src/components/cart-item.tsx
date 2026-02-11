@@ -1,5 +1,33 @@
 "use client"
 
+/**
+ * CartItem — 장바구니 한 줄 아이템 컴포넌트
+ *
+ * [모양]
+ * - 가로: 썸네일(24x24) | 상품명/카테고리 | 수량 +/- 입력 | 소계 금액 | 삭제 버튼
+ * - 반응형: sm 미만은 세로 배치, sm 이상은 한 줄
+ * - Tailwind: flex, border-b, rounded-md, object-cover
+ *
+ * [기능]
+ * - 수량 변경: Input 직접 입력 또는 +/- 버튼 (최소 1)
+ * - 수량 1일 때 감소 버튼 비활성화
+ * - 삭제 시 useShopStore.removeFromCart(id) 호출 (API 연동)
+ * - 소계: price * quantity 로컬 계산 후 toLocaleString()
+ *
+ * [문법]
+ * - React.ChangeEvent<HTMLInputElement> 로 입력 이벤트 타입
+ * - Number.parseInt + isNaN 검사로 유효 수량만 반영
+ * - sr-only: 스크린 리더용 텍스트(시각적으로 숨김)
+ *
+ * [라이브러리 연계]
+ * - next/image: Image (fill, sizes="96px")
+ * - next/link: Link → /product/[id]
+ * - lucide-react: Minus, Plus, Trash2 아이콘
+ * - @/components/ui: Button, Input (shadcn 스타일)
+ * - @/lib/store: useShopStore (updateCartItemQuantity, removeFromCart)
+ * - @/lib/cart: CartItem 타입
+ */
+
 import type React from "react"
 
 import Image from "next/image"

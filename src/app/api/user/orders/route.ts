@@ -1,7 +1,13 @@
+// =============================================================================
+// 사용자 주문 목록 API - GET /api/user/orders
+// 로그인 사용자의 주문 목록 조회(상품·결제 정보 포함)
+// =============================================================================
+
 import { NextResponse } from 'next/server'
 import prismaClient from '@/lib/prismaClient'
 import { OrderStatus, PaymentStatus, Order } from '@prisma/client'
 import { getSession } from '@/lib/ironSessionControl'
+import { getCdnUrl } from '@/lib/cdn'
 
 // 주문 항목의 타입 정의
 export interface FormattedOrderItem {
@@ -20,6 +26,8 @@ export interface FormattedOrderItem {
 }
 
 // API 응답을 위한 주문 타입 정의
+// Omit<Order, 'items'> 문법은 Order 타입에서 'items' 필드만 제외한 타입을 만든다는 의미입니다.
+// 즉, Order 타입의 모든 필드는 포함하지만, 'items' 필드는 빼고 나머지만 상속받습니다.
 export interface FormattedOrder extends Omit<Order, 'items'> {
   items: FormattedOrderItem[];
   payment: {
@@ -123,7 +131,7 @@ export async function GET(request: Request) {
         ...item,
         product: {
           ...item.product,
-          imageSrc: item.product.images?.[0]?.thumbnail || '/placeholder.svg',
+          imageSrc: getCdnUrl(item.product.images?.[0]?.thumbnail) || '/placeholder.svg',
         },
       })),
     }))

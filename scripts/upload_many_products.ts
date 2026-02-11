@@ -1,6 +1,6 @@
 // npx tsx upload_many_products.ts
 
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient, Category } from '@prisma/client'
 import fs from 'fs'
 import path from 'path'
 import mime from 'mime-types'
@@ -10,7 +10,9 @@ import pool from '@/lib/pgClient'
 import pgvector from 'pgvector'
 import sharp from 'sharp' // 이미지 처리를 위한 라이브러리
 
+// Prisma: 상품·이미지 등 DB CRUD용
 const prisma = new PrismaClient()
+// OpenAI: 상품 설명 텍스트 → 벡터(임베딩) 생성용
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 })
@@ -35,6 +37,7 @@ async function uploadImage(imagePath: string, bucketPath: string = 'products') {
     `http://localhost:3000/api/presignedUrl?fileType=${fileType}&bucketPath=${bucketPath}`,
     { method: 'GET' }
   )
+  // API 응답에서 S3 업로드용 URL과 저장될 파일 키(경로) 추출
   const { uploadUrl, key } = await presignedResponse.json()
   console.log('Presigned URL 발급 완료:', uploadUrl)
 
@@ -95,14 +98,18 @@ async function processAndUploadImage(imagePath: string) {
   }
 }
 
-// 상품 설명으로부터 임베딩 생성
+/**
+ * 상품 설명(텍스트)을 OpenAI 임베딩 API로 벡터화합니다.
+ * - 검색/추천 시 유사도 비교에 사용됩니다.
+ */
 async function generateEmbedding(text: string) {
   try {
     const embedding = await openai.embeddings.create({
-      model: 'text-embedding-3-small',
-      input: text,
-      encoding_format: 'float',
+      model: 'text-embedding-3-small', // OpenAI 임베딩 모델명
+      input: text,                      // 벡터로 바꿀 텍스트
+      encoding_format: 'float',        // 벡터 원소 타입 (float 배열)
     })
+    // 응답에서 첫 번째(유일한) 임베딩 벡터 배열 반환
     return embedding.data[0].embedding
   } catch (error) {
     console.error('임베딩 생성 중 오류 발생:', error)
@@ -110,16 +117,22 @@ async function generateEmbedding(text: string) {
   }
 }
 
-// 벡터 업데이트 함수
+/**
+ * 상품 벡터(임베딩) 업데이트 함수
+ * - PostgreSQL pgvector 형식으로 변환 후 Product.vector 컬럼을 갱신합니다.
+ */
 async function updateProductVector(productId: number, embeddings: number[]) {
+  // 숫자 배열을 pgvector 문법 문자열로 변환 (예: '[0.1, -0.2, ...]')
   const postEmbedding = pgvector.toSql(embeddings)
   
+  // Product 테이블에서 해당 id의 vector만 업데이트 (pgvector 타입 캐스트)
   const queryText = `
     UPDATE "Product"
-    SET "vector" = $1
+    SET "vector" = $1::vector
     WHERE "id" = $2
   `
 
+  // $1, $2에 바인딩할 값 (vector 문자열, 상품 id)
   const values = [postEmbedding, productId]
 
   try {
@@ -132,10 +145,24 @@ async function updateProductVector(productId: number, embeddings: number[]) {
   }
 }
 
+/**
+ * 상품명에서 카테고리 추론 (7종류 → 앱 카테고리: MEN, WOMEN, SHOES, ACCESSORIES)
+ */
+function getCategoryFromName(name: string): Category | null {
+  if (name.includes('남성')) return 'MEN'
+  if (name.includes('여성')) return 'WOMEN'
+  if (name.includes('신발')) return 'SHOES'
+  if (name.includes('장신구')) return 'ACCESSORIES'
+  return null
+}
+
+/**
+ * 메인 실행: updated_products.json의 상품을 순서대로 DB 등록·이미지 업로드·벡터 저장합니다.
+ */
 async function main() {
   try {
-    // 상품 데이터 파일 읽기
-    const productsFilePath = path.resolve('./products/updated_products.json')
+    // 상품 데이터 파일 읽기 (스크립트 파일 위치 기준 scripts/products/updated_products.json)
+    const productsFilePath = path.join(__dirname, 'products', 'updated_products.json')
     const productsData = JSON.parse(fs.readFileSync(productsFilePath, 'utf8'))
     
     console.log(`총 ${productsData.length}개의 상품을 처리합니다.`)
@@ -143,19 +170,21 @@ async function main() {
     // 각 상품 처리
     for (let i = 0; i < productsData.length; i++) {
       const product = productsData[i]
-      console.log(`[${i+1}/${productsData.length}] 상품 처리 중: ${product.name}`)
+      const category = getCategoryFromName(product.name)
+      console.log(`[${i+1}/${productsData.length}] 상품 처리 중: ${product.name}${category ? ` (${category})` : ''}`)
       
       try {
         // 1. 상품 설명으로부터 임베딩 생성
         const embeddings = await generateEmbedding(product.description)
         
-        // 2. 상품 기본 정보 DB에 저장
+        // 2. 상품 기본 정보 DB에 저장 (7종류 구조에 맞춰 category 매핑)
         const createdProduct = await prisma.product.create({
           data: {
             name: product.name,
             description: product.description,
             price: product.price,
             stock: product.stock,
+            category,
           },
         })
         console.log(`상품 기본 정보 저장 완료. ID: ${createdProduct.id}`)
@@ -166,8 +195,14 @@ async function main() {
         }
         
         // 4. 이미지 처리 및 업로드
+        let imageCount = 0
         for (const imagePath of product.images) {
-          const fullImagePath = path.resolve(`./products/${imagePath}`)
+          // 상대 경로를 스크립트 실행 위치 기준 절대 경로로 변환
+          const fullImagePath = path.join(__dirname, 'products', imagePath)
+          if (!fs.existsSync(fullImagePath)) {
+            console.warn(`  [경고] 파일 없음 - 이미지 스킵: ${fullImagePath}`)
+            continue
+          }
           console.log(`이미지 처리 중: ${fullImagePath}`)
           
           const { originalKey, thumbnailKey } = await processAndUploadImage(fullImagePath)
@@ -181,8 +216,14 @@ async function main() {
                 productId: createdProduct.id
               }
             })
+            imageCount++
             console.log(`이미지 정보 저장 완료. 원본: ${originalKey}, 썸네일: ${thumbnailKey}`)
+          } else {
+            console.warn(`  [경고] 업로드/변환 실패 - 이미지 스킵: ${fullImagePath}`)
           }
+        }
+        if (imageCount === 0) {
+          console.warn(`  [경고] 상품 ID ${createdProduct.id}("${product.name}")에 이미지가 0건 등록됨. 목록/카테고리에서 플레이스홀더로 표시됩니다.`)
         }
         
         console.log(`상품 "${product.name}" 처리 완료\n`)
@@ -200,6 +241,7 @@ async function main() {
   }
 }
 
+// 스크립트 실행: 성공 시 Prisma 연결 종료, 실패 시 에러 출력 후 연결 종료하고 프로세스 종료(1)
 main()
   .then(async () => {
     await prisma.$disconnect()

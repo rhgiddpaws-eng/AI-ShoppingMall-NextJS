@@ -1,3 +1,8 @@
+// =============================================================================
+// 관리자 상품 이미지 등록 API - POST /api/admin/products/[id]/images
+// body: original, thumbnail(S3 키) → ProductImage 레코드 생성
+// =============================================================================
+
 import { NextResponse } from "next/server"
 import prismaClient from "@/lib/prismaClient"
 import { requireAdminSession } from "@/lib/requireAdminSession"
@@ -7,7 +12,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const auth = await requireAdminSession()
-  if (auth.error) return auth.error
+  if ("error" in auth) return auth.error
   try {
     const productId = (await params).id
     const { original, thumbnail } = await request.json()

@@ -1,4 +1,8 @@
 'use client'
+// =============================================================================
+// 회원가입 페이지 - /register
+// 이름/이메일/비밀번호/비밀번호 확인 폼, API 회원가입 후 로그인 페이지로 이동
+// =============================================================================
 
 import { useState } from 'react'
 import Link from 'next/link'
@@ -41,6 +45,7 @@ const registerUser = async (data: RegisterForm) => {
   return json as RegisterResponse
 }
 
+/** 회원가입: zod 검증 후 /api/register 호출, 성공 시 /login으로 이동 */
 export default function RegisterPage() {
   const [isLoading, setIsLoading] = useState(false)
 

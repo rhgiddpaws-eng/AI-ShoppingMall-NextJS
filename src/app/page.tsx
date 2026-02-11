@@ -1,3 +1,8 @@
+// =============================================================================
+// 메인 페이지 (홈)
+// 쇼핑몰 랜딩: 히어로 배너, 카테고리, 인기/신상품, 프로모션, 푸터
+// =============================================================================
+
 import Link from 'next/link'
 import Image from 'next/image'
 
@@ -6,15 +11,20 @@ import { FeaturedProducts } from '@/components/featured-products'
 import { NavBar } from '@/components/NavBar'
 import { NewProducts } from '@/components/new-products'
 
+/**
+ * 홈 페이지 컴포넌트
+ * - 전체를 min-h-screen 플렉스 컬럼으로 구성 (헤더·메인·푸터)
+ */
 export default function Home() {
   return (
     <div className="flex flex-col min-h-screen">
+      {/* 상단 네비게이션 (로고, 메뉴, 장바구니 등) */}
       <NavBar />
 
       <main className="flex-1">
-        {/* Hero Banner */}
+        {/* Hero Banner: 메인 비주얼 + CTA 버튼 (신상품/세일) */}
         <section className="relative">
-          <div className="relative h-[300px] sm:h-[400px] md:h-[500px] lg:h-[600px] w-full">
+            <div className="relative h-[300px] sm:h-[400px] md:h-[500px] lg:h-[600px] w-full">
             <Image
               src="/main/1.webp"
               alt="Summer Collection"
@@ -23,6 +33,7 @@ export default function Home() {
               className="object-cover"
               priority
             />
+            {/* 히어로 오버레이: 제목, 부제, CTA 버튼 */}
             <div className="absolute inset-0 bg-black/30 flex flex-col items-center justify-center text-white p-4">
               <h1 className="text-3xl md:text-5xl font-bold text-center mb-4">
                 여름 컬렉션 출시
@@ -47,7 +58,7 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Categories */}
+        {/* Categories: 남성/여성/액세서리/신발 카테고리 그리드 링크 */}
         <section className="py-12 container mx-auto px-4">
           <h2 className="text-2xl font-bold mb-6">카테고리</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -116,7 +127,7 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Featured Products */}
+        {/* Featured Products: 인기 상품 섹션 (배경 muted) */}
         <section className="py-12 bg-muted">
           <div className="container mx-auto px-4">
             <h2 className="text-2xl font-bold mb-6">인기 상품</h2>
@@ -124,7 +135,7 @@ export default function Home() {
           </div>
         </section>
 
-        {/* New Arrivals */}
+        {/* New Arrivals: 신상품 목록 + "더 보기" 버튼 */}
         <section className="py-12 container mx-auto px-4">
           <h2 className="text-2xl font-bold mb-6">신상품</h2>
           <NewProducts />
@@ -135,7 +146,7 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Promotion Banner */}
+        {/* Promotion Banner: 신규 회원 10% 할인 CTA */}
         <section className="py-12 bg-primary text-primary-foreground">
           <div className="container mx-auto px-4 text-center">
             <h2 className="text-2xl md:text-3xl font-bold mb-4">
@@ -151,6 +162,7 @@ export default function Home() {
         </section>
       </main>
 
+      {/* 푸터: 4열 링크 그룹(고객서비스/쇼핑/회사/법적고지) + 저작권 */}
       <footer className="border-t py-8 bg-muted/50">
         <div className="container mx-auto px-4">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">

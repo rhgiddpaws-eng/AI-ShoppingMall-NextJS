@@ -31,6 +31,7 @@ model User {
   addresses Address[]
   cart      Cart?
   wishlist  Wishlist?
+  inquiries Inquiry[]
 }
 
 model Address {
@@ -137,8 +138,25 @@ model Order {
   updatedAt   DateTime    @updatedAt
 
   // 관계
-  items   OrderItem[]
-  payment Payment? // 1:1 관계, 결제 정보는 주문이 생성된 후 연결
+  items     OrderItem[]
+  payment   Payment? // 1:1 관계, 결제 정보는 주문이 생성된 후 연결
+  inquiries Inquiry[]
+}
+
+// 문의하기 (주문 관련 문의, 이미지/동영상 첨부 S3 키 저장)
+model Inquiry {
+  id             Int       @id @default(autoincrement())
+  userId         Int
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orderId        Int?      // 주문 연동 시 사용
+  order          Order?    @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  message        String
+  attachmentKeys String[]  @default([]) // S3 키 목록 (inquiries/{userId}/...)
+  replyMessage   String?   // 관리자 답변
+  repliedAt      DateTime?
+  repliedBy      Int?      // 답변한 관리자 userId
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 }
 
 model OrderItem {

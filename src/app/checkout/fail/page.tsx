@@ -1,7 +1,12 @@
 'use client'
+// =============================================================================
+// 결제 실패 페이지 - /checkout/fail
+// URL 쿼리(code, message)로 에러 표시, 다시 테스트/에러코드 문서/문의 링크
+// =============================================================================
 
 import { useSearchParams } from "next/navigation";
 
+/** 결제 실패: code·message 표시, 토스 개발자 문서·문의 링크 제공 */
 export default function FailPage() {
   const searchParams = useSearchParams();
   const errorCode = searchParams.get("code");

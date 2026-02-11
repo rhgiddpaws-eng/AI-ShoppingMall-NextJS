@@ -1,3 +1,8 @@
+// =============================================================================
+// 회원가입 API - POST /api/register
+// 이름·이메일·비밀번호 검증, 이메일 중복 확인, 비밀번호 해시 후 User 생성
+// =============================================================================
+
 import prismaClient from '@/lib/prismaClient'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'

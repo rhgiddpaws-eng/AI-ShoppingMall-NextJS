@@ -1,42 +1,31 @@
-import type React from "react"
-import { redirect } from "next/navigation"
-import { getIronSession } from "iron-session"
-import { cookies } from "next/headers"
-import { AdminSidebar } from "@/components/admin/sidebar"
-import type { SessionData } from "@/lib/session"
-import { sessionOptions } from "@/lib/session"
+// =============================================================================
+// 관리자 레이아웃 - /admin 하위 모든 페이지
+// 레이아웃(Server Component)에서는 cookies()가 비어 있어 세션을 읽지 못하는 경우가 있음.
+// 따라서 AdminGuard(Client)에서 GET /api/admin/me 로 관리자 여부를 검사하고,
+// 비관리자면 / 로 리다이렉트, 관리자면 사이드바 + children 렌더.
+// =============================================================================
 
-/**
- * [admin 페이지 접근 제어]
- * Layout(Node)에서 getIronSession(cookies())로 세션 읽음. 관리자만 통과, 비관리자는 redirect("/").
- * 관리자인데 접근이 안 되면 → 로그인 시 쿠키가 저장·전달되도록 credentials 확인, DB role=ADMIN 확인.
- */
+import type React from "react"
+import { AdminSidebar } from "@/components/admin/sidebar"
+import { AdminGuard } from "@/components/admin/AdminGuard"
+
 export const dynamic = "force-dynamic"
 
-const ADMIN_ROLE = "ADMIN"
-
-export default async function AdminLayout({
+export default function AdminLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  const cookieStore = await cookies()
-  const session = await getIronSession<SessionData>(cookieStore, sessionOptions)
-  const isAdmin = session.isLoggedIn === true && session.role === ADMIN_ROLE
-
-  if (!isAdmin) {
-    redirect("/")
-  }
-
   return (
-    <div className="flex h-screen">
-      <div className="w-64 hidden md:block">
-        <AdminSidebar />
+    <AdminGuard>
+      <div className="flex h-screen">
+        <div className="w-64 hidden md:block">
+          <AdminSidebar />
+        </div>
+        <div className="flex-1 overflow-auto">
+          <div className="p-6">{children}</div>
+        </div>
       </div>
-      <div className="flex-1 overflow-auto">
-        <div className="p-6">{children}</div>
-      </div>
-    </div>
+    </AdminGuard>
   )
 }
-

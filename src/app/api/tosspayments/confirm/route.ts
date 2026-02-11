@@ -1,3 +1,8 @@
+// =============================================================================
+// 토스페이먼츠 결제 승인 API - POST /api/tosspayments/confirm
+// paymentKey, orderId, amount, data 수신 → 토스 승인 호출 후 주문/결제 DB 저장
+// =============================================================================
+
 import { NextResponse } from 'next/server'
 import prismaClient from '@/lib/prismaClient'
 import { OrderStatus, PaymentStatus } from '@prisma/client'

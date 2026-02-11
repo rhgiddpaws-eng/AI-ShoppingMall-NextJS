@@ -1,3 +1,8 @@
+// =============================================================================
+// 관리자 주문 상세 API - GET/PUT /api/admin/orders/[id]
+// GET: 주문 상세 반환. PUT: deliveryStatus 업데이트
+// =============================================================================
+
 import { NextResponse } from "next/server"
 import { requireAdminSession } from "@/lib/requireAdminSession"
 
@@ -90,7 +95,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const auth = await requireAdminSession()
-  if (auth.error) return auth.error
+  if ("error" in auth) return auth.error
   const orderId = (await params).id
 
   // 해당 ID의 주문이 있는지 확인
@@ -106,7 +111,7 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const auth = await requireAdminSession()
-  if (auth.error) return auth.error
+  if ("error" in auth) return auth.error
   const orderId = (await params).id
 
   // 해당 ID의 주문이 있는지 확인

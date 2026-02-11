@@ -1,3 +1,8 @@
+// =============================================================================
+// 알리바바 Qwen 임베딩 API - POST /api/embeddings_alibaba_qwen
+// body: text → 외부 임베딩 서버(gte-Qwen2) 호출 후 벡터 반환
+// =============================================================================
+
 import { NextRequest, NextResponse } from 'next/server'
 import axios from 'axios'
 

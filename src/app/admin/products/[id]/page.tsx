@@ -1,4 +1,8 @@
 "use client"
+// =============================================================================
+// 관리자 상품 수정 - /admin/products/[id]
+// 기본 정보·이미지·옵션 탭, 저장(PUT) / 삭제(DELETE) API 호출
+// =============================================================================
 
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
@@ -24,6 +28,7 @@ interface Product {
   options: string[];
 }
 
+/** 상품 수정: ID로 조회 후 기본정보/이미지/옵션 탭에서 편집, 저장·삭제 처리 */
 export default function ProductDetailPage() {
   const params = useParams()
   const router = useRouter()

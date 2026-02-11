@@ -1,4 +1,9 @@
 'use client'
+// =============================================================================
+// 로그인 페이지 - /login
+// 이메일/비밀번호 로그인 폼, 소셜 로그인(Google/GitHub) 버튼, 회원가입 링크
+// =============================================================================
+
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
@@ -20,6 +25,7 @@ const loginSchema = z.object({
 
 type LoginForm = z.infer<typeof loginSchema>
 
+/** 로그인: 폼 검증 후 useAuthStore.login 호출, 성공 시 /account로 이동 */
 export default function LoginPage() {
   const router = useRouter()
   const { login, isLoading } = useAuthStore()
@@ -36,7 +42,11 @@ export default function LoginPage() {
 
     if (success) {
       toast.success('로그인 성공')
-      router.push('/account')
+      const { user } = useAuthStore.getState()
+      // 로그인 직후 세션 쿠키가 반영된 상태로 이동하려면 RSC 캐시를 무효화해야 함.
+      // 그렇지 않으면 이전에 prefetch된 /admin(비로그인 시 리다이렉트) 결과가 쓰여 /로 튕김.
+      router.refresh()
+      router.push(user?.role === 'ADMIN' ? '/admin' : '/account')
     } else {
       toast.error('로그인 실패')
     }

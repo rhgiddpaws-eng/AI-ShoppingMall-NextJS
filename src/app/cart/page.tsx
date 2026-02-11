@@ -1,4 +1,8 @@
 "use client"
+// =============================================================================
+// 장바구니 페이지 - /cart
+// 장바구니 목록, 상품 금액/배송비/총 결제 금액, 결제하기 버튼
+// =============================================================================
 
 import Link from "next/link"
 import { ArrowLeft, ShoppingCart } from "lucide-react"
@@ -9,6 +13,7 @@ import { Separator } from "@/components/ui/separator"
 import CartItem from "@/components/cart-item"
 import { useShopStore } from "@/lib/store"
 
+/** 장바구니: 상품 목록, 주문 요약(5만원 이상 무료배송), 결제하기 이동 */
 export default function CartPage() {
   const { cart } = useShopStore()
   const router = useRouter()

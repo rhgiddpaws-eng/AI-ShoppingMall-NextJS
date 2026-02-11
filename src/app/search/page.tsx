@@ -1,4 +1,8 @@
 "use client"
+// =============================================================================
+// 상품 검색 페이지 - /search
+// 검색어 입력 후 홈(/?search=...)으로 이동, 카테고리 링크(남성/여성/액세서리/신발)
+// =============================================================================
 
 import { useState } from "react"
 import Link from "next/link"
@@ -8,6 +12,7 @@ import { NavBar } from "@/components/NavBar"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 
+/** 검색: 폼 제출 시 /?search=쿼리로 이동, 카테고리 버튼으로 /category/xxx 이동 */
 export default function SearchPage() {
   const [query, setQuery] = useState("")
   const router = useRouter()

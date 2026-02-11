@@ -223,6 +223,7 @@ volumes:
      DATABASE_URL="postgresql://postgres:비밀번호@localhost:7432/postgres?schema=public" npx prisma migrate deploy
      ```
    - 또는 앱 컨테이너 안에서 마이그레이션 실행하도록 스크립트 구성 가능.
+   - **갱신 사항**: Cart, CartItem, Wishlist, WishlistEntry 테이블이 추가된 마이그레이션(`add_cart_and_wishlist` 등)이 있으면 배포 시 반드시 `prisma migrate deploy` 로 적용할 것.
 
    **DB 백업·복원**
 

@@ -1,4 +1,8 @@
 "use client"
+// =============================================================================
+// 관리자 대시보드 - /admin
+// 통계 카드(사용자/매출/주문/재고), 매출 추이 차트, 주문 상태, 최근 주문/재고 부족 상품
+// =============================================================================
 
 import { useState, useEffect } from "react"
 import { Users, CreditCard, Package, ShoppingCart } from "lucide-react"
@@ -10,6 +14,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 
+/** 관리자 대시보드: /api/admin/dashboard 데이터로 통계·차트·최근 주문·재고 부족 표시 */
 export default function AdminDashboard() {
   const [period, setPeriod] = useState("month")
   const [dashboardData, setDashboardData] = useState<any>(null)

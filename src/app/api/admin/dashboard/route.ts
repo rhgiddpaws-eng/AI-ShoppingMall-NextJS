@@ -1,3 +1,8 @@
+// =============================================================================
+// 관리자 대시보드 API - GET /api/admin/dashboard
+// 쿼리: period(week|month|year) → 통계·매출 추이·주문 상태·최근 주문·재고 부족 상품 반환
+// =============================================================================
+
 import { NextResponse } from "next/server"
 import { requireAdminSession } from "@/lib/requireAdminSession"
 
@@ -77,7 +82,7 @@ function getDashboardData(period: "week" | "month" | "year") {
 
 export async function GET(request: Request) {
   const auth = await requireAdminSession()
-  if (auth.error) return auth.error
+  if ("error" in auth) return auth.error
 
   const { searchParams } = new URL(request.url)
   const period = (searchParams.get("period") ?? "month") as "week" | "month" | "year"

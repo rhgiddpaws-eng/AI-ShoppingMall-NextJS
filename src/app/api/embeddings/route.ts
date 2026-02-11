@@ -1,3 +1,8 @@
+// =============================================================================
+// 임베딩 API - POST /api/embeddings
+// body: text → OpenAI text-embedding-3-small 임베딩 벡터 반환
+// =============================================================================
+
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
 

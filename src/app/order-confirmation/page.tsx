@@ -1,7 +1,13 @@
+// =============================================================================
+// 주문 완료 확인 페이지 - /order-confirmation
+// 결제/주문 완료 후 안내 메시지, 홈으로 돌아가기 버튼
+// =============================================================================
+
 import Link from "next/link"
 import { CheckCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
+/** 주문 완료: 체크 아이콘 + 감사 메시지 + 홈 링크 */
 export default function OrderConfirmationPage() {
   return (
     <div className="container mx-auto px-4 py-8 text-center">

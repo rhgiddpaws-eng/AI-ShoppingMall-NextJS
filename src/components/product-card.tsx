@@ -1,5 +1,36 @@
 'use client'
 
+/**
+ * ProductCard — 상품 카드 (썸네일 + 뱃지 + 호버 시 담기/위시리스트)
+ *
+ * [모양]
+ * - 카드: Link로 감싼 블록, aspect-[3/4] 이미지, object-cover, group-hover:scale-105
+ * - 좌상단: 신상품(파란 Badge), 세일(빨간 Badge)
+ * - 하단: 호버 시 올라오는 바 — 담기 버튼 + 하트(위시리스트 토글), cn()으로 opacity/translate 제어
+ * - 하트가 위시리스트 포함 시 fill-current + text-red-500
+ * - 텍스트: 상품명(line-clamp-1), 카테고리, 가격(세일 시 salePrice + 취소선 원가)
+ *
+ * [기능]
+ * - 클릭: /product/[id] 이동
+ * - 담기: addToCart(할인가 반영), sonner toast 성공 메시지
+ * - 위시리스트: addToWishlist/removeFromWishlist, isInWishlist(id)로 하트 채움 상태 동기화
+ * - 이벤트: e.preventDefault(), e.stopPropagation() 으로 링크 이동 방지
+ *
+ * [문법]
+ * - isHovered 로 퀵 액션 바 표시 여부
+ * - useEffect(() => setIsWishlisted(isInWishlist(id)), [id, isInWishlist]) 로 스토어와 동기화
+ * - salePrice 있을 때만 할인가 표시
+ *
+ * [라이브러리 연계]
+ * - next/image: Image (fill, sizes 반응형), priority
+ * - next/link: Link
+ * - lucide-react: Heart, ShoppingCart
+ * - @/components/ui: Button, Badge
+ * - @/lib/utils: cn (classnames 병합)
+ * - @/lib/store: useShopStore (addToCart, addToWishlist, isInWishlist, removeFromWishlist)
+ * - sonner: toast.success
+ */
+
 import type React from 'react'
 
 import { useState, useEffect } from 'react'

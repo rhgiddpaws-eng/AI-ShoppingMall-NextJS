@@ -1,4 +1,8 @@
 'use client'
+// =============================================================================
+// 관리자 주문 관리 - /admin/orders
+// 주문 검색·상태 필터, 주문 목록 테이블, 배송 상태 변경(PUT /api/admin/orders)
+// =============================================================================
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
@@ -46,6 +50,7 @@ interface Order {
   deliveryStatus: string
 }
 
+/** 주문 관리: 검색/필터 후 목록 표시, 배송 상태 변경 시 API 호출 및 목록 갱신 */
 export default function OrdersPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')

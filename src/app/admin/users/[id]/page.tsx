@@ -1,4 +1,8 @@
 'use client'
+// =============================================================================
+// 관리자 사용자 상세 - /admin/users/[id]
+// 프로필·주문 내역·보안 및 권한 탭, 정보 수정(PUT /api/admin/users/[id])
+// =============================================================================
 
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
@@ -48,6 +52,7 @@ interface User {
   orders: Order[]
 }
 
+/** 사용자 상세: 프로필/주문/권한 탭, 저장 시 PUT으로 업데이트 */
 export default function UserDetailPage() {
   const params = useParams()
   const router = useRouter()

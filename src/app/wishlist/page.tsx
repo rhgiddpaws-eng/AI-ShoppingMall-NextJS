@@ -1,4 +1,8 @@
 "use client"
+// =============================================================================
+// 위시리스트 페이지 - /wishlist
+// Store 위시리스트 목록 표시, 비어 있으면 안내 + 쇼핑 계속하기
+// =============================================================================
 
 import Link from "next/link"
 import { ArrowLeft, Heart } from "lucide-react"
@@ -7,6 +11,7 @@ import { Button } from "@/components/ui/button"
 import WishlistItem from "@/components/wishlist-item"
 import { useShopStore } from "@/lib/store"
 
+/** 위시리스트: useShopStore.wishlist 목록 렌더, 비면 빈 상태 UI */
 export default function WishlistPage() {
   const { wishlist } = useShopStore()
 

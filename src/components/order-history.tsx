@@ -1,5 +1,40 @@
 'use client'
 
+/**
+ * OrderHistory — 주문 목록 + 무한 스크롤 + 상세 뷰
+ *
+ * [모양]
+ * - 상단: 상태 필터 버튼(전체/대기중/결제완료/취소됨), 가로 스크롤
+ * - 목록: 카드 리스트 — 주문번호, 날짜, 상태 뱃지, 대표 썸네일, 첫 상품명, 총액, "상세보기"
+ * - 무한 스크롤: loadMoreRef 영역 진입 시 fetchNextPage, 로딩 시 스피너 또는 "더 보기" 버튼
+ * - 상세 화면: "주문 목록으로" 뒤로가기, 주문 상품 목록, 결제 정보/주문 요약 카드, 문의하기 링크
+ * - 로딩: Skeleton 카드 3개. 에러/빈 목록 시 아이콘+메시지
+ *
+ * [기능]
+ * - 주문 목록: useInfiniteQuery, cursor 기반 페이지네이션, limit=5
+ * - 상태 필터: status 쿼리 파라미터로 재조회
+ * - 주문 상세: 선택 시 useQuery로 /api/user/orders/[id], enabled: !!selectedOrderId
+ * - 무한 스크롤: useIntersection(loadMoreRef), isIntersecting 시 fetchNextPage
+ * - 날짜: date-fns format(..., 'yyyy년 MM월 dd일', { locale: ko })
+ * - OrderStatus에 따라 Badge 스타일(대기중/결제완료/취소됨)
+ *
+ * [문법]
+ * - getNextPageParam: lastPage.nextCursor
+ * - data.pages.flatMap(p => p.orders) 로 전체 주문 배열 생성
+ * - Prisma enum: OrderStatus, PaymentStatus
+ *
+ * [라이브러리 연계]
+ * - react: useState, useRef, useCallback, useEffect
+ * - next/link, next/image
+ * - date-fns: format, date-fns/locale: ko
+ * - lucide-react: ChevronRight, Package, AlertTriangle, CheckCircle, Clock
+ * - @tanstack/react-query: useInfiniteQuery, useQuery, InfiniteData
+ * - @/components/ui: Badge, Button, Card, CardContent, Skeleton
+ * - @/hooks/use-intersection: useIntersection
+ * - @prisma/client: OrderStatus, PaymentStatus
+ * - @/app/api/user/orders/route: 타입 및 API 스펙
+ */
+
 import { useState, useRef, useCallback, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -19,6 +54,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useIntersection } from '@/hooks/use-intersection'
+import { getCdnUrl } from '@/lib/cdn'
 import { OrderStatus, PaymentStatus } from '@prisma/client'
 import {
   OrdersResponse,
@@ -33,6 +69,7 @@ const fetchOrders = async ({
   status = null,
 }: OrdersQueryParams): Promise<OrdersResponse> => {
   const params = new URLSearchParams()
+  
   if (pageParam) params.append('cursor', pageParam.toString())
   if (status) params.append('status', status)
   params.append('limit', '5')
@@ -81,8 +118,8 @@ export function OrderHistory() {
     queryKey: ['orders', statusFilter],
     queryFn: ({ pageParam }) =>
       fetchOrders({ pageParam, status: statusFilter }),
-    getNextPageParam: (lastPage: OrdersResponse) => lastPage.nextCursor,
-    initialPageParam: null,
+      getNextPageParam: (lastPage: OrdersResponse) => lastPage.nextCursor,
+      initialPageParam: null,
   })
 
   // 주문 상세 정보 쿼리
@@ -270,7 +307,7 @@ export function OrderHistory() {
                   >
                     <div className="relative h-16 w-16 bg-muted rounded overflow-hidden">
                       <Image
-                        src={`https://cdn.yes.monster/${item.product.imageSrc}` || '/placeholder.svg'}
+                        src={getCdnUrl(item.product.imageSrc)}
                         alt={item.product.name}
                         fill
                         sizes="64px"
@@ -357,7 +394,7 @@ export function OrderHistory() {
 
         <div className="flex justify-center mt-6">
           <Button variant="outline" size="sm" asChild>
-            <Link href="/support">문의하기</Link>
+            <Link href={`/support?orderId=${selectedOrder.id}`}>문의하기</Link>
           </Button>
         </div>
       </div>
@@ -384,7 +421,7 @@ export function OrderHistory() {
             <div className="flex items-center gap-4">
               <div className="relative h-16 w-16 bg-muted rounded overflow-hidden">
                 <Image
-                  src={`https://cdn.yes.monster/${order.items[0].product.imageSrc}` || '/placeholder.svg'}
+                  src={getCdnUrl(order.items[0].product.imageSrc)}
                   alt={order.items[0].product.name}
                   fill
                   sizes="64px"

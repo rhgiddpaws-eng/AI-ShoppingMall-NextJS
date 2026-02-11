@@ -1,61 +1,18 @@
+// =============================================================================
+// 관리자 상품 상세 API - GET/PUT/DELETE /api/admin/products/[id]
+// GET: 상품 상세. PUT: 수정. DELETE: 삭제
+// =============================================================================
+
 import { NextResponse } from "next/server"
 import { requireAdminSession } from "@/lib/requireAdminSession"
-
-// 상품 상세 모킹 데이터
-interface ProductData {
-  id: string;
-  name: string;
-  description: string;
-  category: string;
-  price: number;
-  stock: number;
-  status: string;
-  images: string[];
-  options: string[];
-}
-
-const productsData: { [key: string]: ProductData } = {
-  "PRD-001": {
-    id: "PRD-001",
-    name: "프리미엄 코튼 티셔츠",
-    description: "고급 코튼 소재로 제작된 편안한 티셔츠입니다. 다양한 색상과 사이즈로 제공됩니다.",
-    category: "의류",
-    price: 39000,
-    stock: 45,
-    status: "판매중",
-    images: ["/placeholder.svg?height=400&width=300"],
-    options: ["S", "M", "L", "XL"],
-  },
-  "PRD-002": {
-    id: "PRD-002",
-    name: "슬림핏 데님 청바지",
-    description: "편안한 착용감과 세련된 디자인의 슬림핏 데님 청바지입니다.",
-    category: "의류",
-    price: 79000,
-    stock: 32,
-    status: "판매중",
-    images: ["/placeholder.svg?height=400&width=300"],
-    options: ["28", "30", "32", "34"],
-  },
-  "PRD-003": {
-    id: "PRD-003",
-    name: "캐주얼 후드 집업",
-    description: "일상에서 편하게 입을 수 있는 캐주얼한 후드 집업입니다.",
-    category: "의류",
-    price: 89000,
-    stock: 18,
-    status: "판매중",
-    images: ["/placeholder.svg?height=400&width=300"],
-    options: ["M", "L", "XL"],
-  },
-}
+import prismaClient from "@/lib/prismaClient"
+import { getCdnUrl } from "@/lib/cdn"
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireAdminSession()
-  if (auth.error) return auth.error
+  if ("error" in auth) return auth.error
   const productId = (await params).id
 
-  // 새 상품 등록 페이지인 경우 빈 템플릿 반환
   if (productId === "new") {
     return NextResponse.json({
       id: "",
@@ -70,53 +27,82 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     })
   }
 
-  // 해당 ID의 상품이 있는지 확인
-  if (!productsData[productId]) {
+  const id = parseInt(productId, 10)
+  if (isNaN(id)) {
     return NextResponse.json({ error: "상품을 찾을 수 없습니다" }, { status: 404 })
   }
 
-  return NextResponse.json(productsData[productId])
+  const p = await prismaClient.product.findUnique({
+    where: { id },
+    include: { images: { orderBy: { id: "asc" } } },
+  })
+  if (!p) {
+    return NextResponse.json({ error: "상품을 찾을 수 없습니다" }, { status: 404 })
+  }
+
+  const statusDisplay =
+    (p as { status?: string }).status === "DRAFT" ? "임시저장" : p.stock <= 0 ? "품절" : "판매중"
+  return NextResponse.json({
+    id: String(p.id),
+    name: p.name,
+    description: p.description ?? "",
+    category: p.category ?? "",
+    price: p.price,
+    stock: p.stock,
+    status: statusDisplay,
+    images: p.images.map((img) => getCdnUrl(img.original)),
+    options: [],
+  })
 }
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireAdminSession()
-  if (auth.error) return auth.error
+  if ("error" in auth) return auth.error
   const productId = (await params).id
-
-  // 해당 ID의 상품이 있는지 확인
-  if (!productsData[productId]) {
+  const id = parseInt(productId, 10)
+  if (isNaN(id)) {
     return NextResponse.json({ error: "상품을 찾을 수 없습니다" }, { status: 404 })
   }
 
   try {
-    const updatedProduct = await request.json()
-
-    // 실제 구현에서는 데이터베이스에 업데이트하는 로직이 들어갑니다
-    // 여기서는 간단히 성공 응답만 반환합니다
-
-    return NextResponse.json({
-      ...productsData[productId],
-      ...updatedProduct,
-      id: productId, // ID는 변경 불가
+    const body = await request.json()
+    const updated = await prismaClient.product.update({
+      where: { id },
+      data: {
+        name: body.name,
+        description: body.description,
+        category: body.category ?? null,
+        price: body.price,
+        stock: body.stock,
+        discountRate: body.discountRate ?? 0,
+      },
     })
+    return NextResponse.json(updated)
   } catch (error) {
+    console.error("상품 업데이트 실패:", error)
     return NextResponse.json({ error: "상품 정보 업데이트 실패" }, { status: 400 })
   }
 }
 
 export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireAdminSession()
-  if (auth.error) return auth.error
+  if ("error" in auth) return auth.error
   const productId = (await params).id
-
-  // 해당 ID의 상품이 있는지 확인
-  if (!productsData[productId]) {
+  const id = parseInt(productId, 10)
+  if (isNaN(id)) {
     return NextResponse.json({ error: "상품을 찾을 수 없습니다" }, { status: 404 })
   }
 
-  // 실제 구현에서는 데이터베이스에서 삭제하는 로직이 들어갑니다
-  // 여기서는 간단히 성공 응답만 반환합니다
+  const withOrders = await prismaClient.orderItem.findFirst({ where: { productId: id } })
+  if (withOrders) {
+    return NextResponse.json(
+      { error: "주문에 포함된 상품은 삭제할 수 없습니다." },
+      { status: 400 }
+    )
+  }
 
+  await prismaClient.image.deleteMany({ where: { productId: id } })
+  await prismaClient.product.delete({ where: { id } })
   return NextResponse.json({ message: "상품이 성공적으로 삭제되었습니다" })
 }
 

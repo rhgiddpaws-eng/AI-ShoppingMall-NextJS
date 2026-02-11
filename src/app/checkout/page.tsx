@@ -1,4 +1,8 @@
 'use client'
+// =============================================================================
+// 결제 페이지 - /checkout
+// 주문 상품 요약, 배송 정보 폼, 결제 수단 선택, 토스페이먼츠 위젯 연동
+// =============================================================================
 
 import type React from 'react'
 
@@ -15,6 +19,7 @@ import { Separator } from '@/components/ui/separator'
 import { toast } from 'sonner'
 import TossPayments from './components/TossPayments'
 
+/** 결제: 장바구니 비면 안내, 아니면 주문 요약 + 배송 정보 + TossPayments 위젯 */
 export default function CheckoutPage() {
   const router = useRouter()
   const { cart, clearCart } = useShopStore()
@@ -174,6 +179,12 @@ export default function CheckoutPage() {
             customerName={customerName}
             customerEmail={customerEmail}
             cart={cart}
+            amount={finalAmount}
+            onTestPaymentSuccess={() => {
+              clearCart()
+              toast.success('테스트 주문이 완료되었습니다')
+              router.push('/order-confirmation')
+            }}
           />
         </div>
       </div>

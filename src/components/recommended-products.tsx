@@ -1,5 +1,30 @@
 "use client"
 
+/**
+ * RecommendedProducts — 상품 상세 페이지 하단 "추천 상품" 섹션
+ *
+ * [모양]
+ * - 제목: "추천 상품" (text-2xl font-bold mb-6)
+ * - 그리드: 1열 / 2열(sm) / 4열(md), gap-6
+ * - 로딩: "추천 상품을 불러오는 중..." 텍스트
+ * - 에러: 빨간 텍스트로 에러 메시지
+ * - 데이터 없음: null 반환(아무것도 안 그림)
+ *
+ * [기능]
+ * - currentProductId 제외하고 GET /api/products/recommended?exclude=[id] 호출
+ * - 응답 배열을 ProductCard 리스트로 렌더, id/name/price/imageSrc/category 전달
+ * - exclude로 현재 상품이 추천 목록에 안 나오도록 함
+ *
+ * [문법]
+ * - Product 인터페이스: id(string|number), name, price, imageSrc, category
+ * - key=product.id, id는 product.id.toString()
+ *
+ * [라이브러리 연계]
+ * - react: useState, useEffect
+ * - @/components/product-card: ProductCard
+ * - fetch: /api/products/recommended (내부 API)
+ */
+
 import { useState, useEffect } from "react"
 import ProductCard from "@/components/product-card"
 

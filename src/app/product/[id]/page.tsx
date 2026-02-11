@@ -1,4 +1,8 @@
 'use client'
+// =============================================================================
+// 상품 상세 페이지 - /product/[id]
+// 상품 정보·이미지·가격·할인·장바구니/위시리스트, 상세/배송 탭, 추천 상품
+// =============================================================================
 
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
@@ -10,6 +14,7 @@ import { useShopStore } from '@/lib/store'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { toast } from 'sonner'
 import { apiRoutes } from '@/lib/apiRoutes'
+import { getCdnUrl } from '@/lib/cdn'
 import { RecommendedProducts } from '@/components/recommended-products'
 
 type ProductType = {
@@ -27,6 +32,7 @@ type ProductType = {
   }[]
 }
 
+/** 상품 상세: ID로 API 조회, 장바구니/위시리스트 추가, 상세/배송 탭, 추천 상품 컴포넌트 */
 export default function ProductPage() {
   const params = useParams()
   const router = useRouter()
@@ -83,7 +89,7 @@ export default function ProductPage() {
       price: product.price,
       imageSrc:
         product.images.length > 0
-          ? `https://cdn.yes.monster/${product.images[0].original}`
+          ? getCdnUrl(product.images[0].original)
           : '/placeholder.svg',
       quantity: 1,
       category: product.category || '기타',
@@ -105,7 +111,7 @@ export default function ProductPage() {
         price: product.price,
         imageSrc:
           product.images.length > 0
-            ? `https://cdn.yes.monster/${product.images[0].original}`
+            ? getCdnUrl(product.images[0].original)
             : '/placeholder.svg',
         category: product.category || '기타',
       })
@@ -146,7 +152,7 @@ export default function ProductPage() {
 
   const imageUrl =
     product.images.length > 0
-      ? `https://cdn.yes.monster/${product.images[0].original}`
+      ? getCdnUrl(product.images[0].original)
       : '/placeholder.svg'
 
   const finalPrice = product.price * (1 - product.discountRate)

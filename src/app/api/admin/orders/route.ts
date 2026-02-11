@@ -1,3 +1,8 @@
+// =============================================================================
+// 관리자 주문 API - GET /api/admin/orders, PUT 배송 상태 변경
+// 쿼리: search, status → 주문 목록 반환. PUT: orderId, deliveryStatus
+// =============================================================================
+
 import { NextResponse } from "next/server"
 import { requireAdminSession } from "@/lib/requireAdminSession"
 
@@ -70,7 +75,7 @@ const orders = [
 
 export async function GET(request: Request) {
   const auth = await requireAdminSession()
-  if (auth.error) return auth.error
+  if ("error" in auth) return auth.error
   const { searchParams } = new URL(request.url)
   const search = searchParams.get("search")?.toLowerCase()
   const status = searchParams.get("status")
@@ -93,7 +98,7 @@ export async function GET(request: Request) {
 
 export async function PUT(request: Request) {
   const auth = await requireAdminSession()
-  if (auth.error) return auth.error
+  if ("error" in auth) return auth.error
   try {
     const { orderId, deliveryStatus } = await request.json()
 

@@ -1,0 +1,113 @@
+{
+  "mcpServers": {
+    "playwright": {
+      "command": "npx",
+      "args": [
+        "@playwright/mcp@latest"
+      ]
+    },
+    "puppeteer": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "puppeteer-mcp-server"
+      ],
+      "env": {}
+    },
+    "browserbase": {
+      "command": "npx",
+      "args": [
+        "@browserbasehq/mcp-server-browserbase"
+      ],
+      "env": {
+        "BROWSERBASE_API_KEY": "bb_live_8ntZ1aGcO8_phiJN1qpjcguIOcU",
+        "BROWSERBASE_PROJECT_ID": "49100e94-5d50-487e-99dd-8345d2d7f9b2",
+        "GEMINI_API_KEY": "AIzaSyBvz7xQ-bdAthR26ev6RozUsiJCsi4XMx4"
+      }
+    },
+    "exa": {
+      "type": "http",
+      "url": "https://mcp.exa.ai/mcp",
+      "headers": {}
+    },
+    "shadcn": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "shadcn-ui-mcp-server"
+      ]
+    },
+    "@21st-dev/magic": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@21st-dev/magic@latest",
+        "API_KEY=\"cbcdbd17264e4cf5264f357a5fa24cdcfac81a351e6d41a9e5fa64ba7fb0b6bb\""
+      ]
+    },
+    "Notion": {
+      "url": "https://mcp.notion.com/mcp",
+      "headers": {}
+    },
+    "Figma": {
+      "url": "https://mcp.figma.com/mcp",
+      "headers": {}
+    },
+    "Context7": {
+      "url": "https://mcp.context7.com/mcp",
+      "headers": {}
+    },
+    "tosspayments-integration-guide": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@tosspayments/integration-guide-mcp@latest"
+      ],
+      "env": {
+        "TOSS_PAYMENTS_CLIENT_KEY": "test_ck_LkKEypNArWQEBklzaw2e3lmeaxYG"
+      }
+    },
+    "blender": {
+      "command": "cmd",
+      "args": [
+        "/c",
+        "uvx",
+        "blender-mcp"
+      ],
+      "env": {
+        "PORT": "9876",
+        "BLENDER_PORT": "9876",
+        "BLENDER_HOST": "127.0.0.1",
+        "HOST": "127.0.0.1"
+      }
+    },
+    "sequential-thinking": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-sequential-thinking"
+      ]
+    },    
+    "notebooklm-mcp": {
+      "command": "C:\\Users\\KUS\\.local\\bin\\notebooklm-mcp.exe",
+      "args": []
+    },
+    "supabase-mcp-server": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@supabase/mcp-server-supabase@latest",
+        "--access-token",
+        "sbp_755ff7a0fc63c1400f67f0ab32e974d0e3f6cc5c"
+      ],
+      "env": {}
+    },
+    "portone": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@portone/mcp-server@latest"
+      ]
+    }
+  }
+}

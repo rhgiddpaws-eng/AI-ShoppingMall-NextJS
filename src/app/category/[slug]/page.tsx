@@ -1,4 +1,8 @@
 'use client'
+// =============================================================================
+// 카테고리별 상품 목록 - /category/[slug]
+// slug별 무한 스크롤 상품 목록, 검색·정렬 필터
+// =============================================================================
 
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
@@ -20,7 +24,9 @@ import {
 } from '@/components/ui/select'
 import useInputDebounce from '@/hooks/useInputDebounce'
 import { apiRoutes } from '@/lib/apiRoutes'
+import { getCdnUrl } from '@/lib/cdn'
 
+/** 카테고리 페이지: slug·정렬·검색어로 infinite API 호출, 무한 스크롤로 상품 그리드 표시 */
 export default function CategoryPage() {
   const { searchTerm, onSearchTermChange } = useInputDebounce()
   const params = useParams()
@@ -33,6 +39,9 @@ export default function CategoryPage() {
     const response = await fetch(
       `${apiRoutes.routes.products.routes.infinite.path}?category=${category}&sort=${sortBy}&order=${order}&term=${searchTerm}&page=${pageParam}&pageSize=12`,
     )
+    if (!response.ok) {
+      return { products: [], total: 0, hasMore: false }
+    }
     return response.json()
   }
 
@@ -41,19 +50,18 @@ export default function CategoryPage() {
       queryKey: ['products', category, sortBy, order, searchTerm],
       queryFn: fetchProducts,
       getNextPageParam: (lastPage, pages) => {
-        return lastPage.hasMore ? pages.length + 1 : undefined
+        return lastPage?.hasMore ? pages.length + 1 : undefined
       },
       initialPageParam: 1,
     })
 
-  console.log('data: ', data)
   useEffect(() => {
     if (inView && hasNextPage) {
       fetchNextPage()
     }
   }, [inView, fetchNextPage, hasNextPage])
 
-  const allProducts = data?.pages.flatMap(page => page.products) ?? []
+  const allProducts = data?.pages.flatMap(page => page?.products ?? []) ?? []
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -64,7 +72,9 @@ export default function CategoryPage() {
             <span className="sr-only">홈으로</span>
           </Link>
         </Button>
-        <h1 className="text-2xl font-bold capitalize">{category} 카테고리</h1>
+        <h1 className="text-2xl font-bold capitalize">
+          {category === 'new' ? '신상품' : `${category} 카테고리`}
+        </h1>
       </div>
 
       <div className="mb-8 flex flex-col sm:flex-row gap-4">
@@ -117,7 +127,7 @@ export default function CategoryPage() {
                 price={product.price}
                 imageSrc={
                   product?.images[0]?.original
-                    ? `https://cdn.yes.monster/${product?.images[0]?.original}`
+                    ? getCdnUrl(product.images[0].original)
                     : '/placeholder.svg?height=400&width=300'
                 }
                 category={product.category || '기타'}

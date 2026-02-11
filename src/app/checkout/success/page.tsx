@@ -1,4 +1,8 @@
 'use client'
+// =============================================================================
+// 결제 성공 페이지 - /checkout/success
+// URL 쿼리(paymentKey, orderId, amount 등)로 결제 승인 API 호출, 성공 시 폭죽·Lottie·감사 메시지
+// =============================================================================
 
 import { useSearchParams } from 'next/navigation'
 import { useState, useEffect } from 'react'
@@ -20,6 +24,7 @@ const thankYouAnimation =
 const successAnimation =
   'https://assets2.lottiefiles.com/private_files/lf30_rysgr4xj.json'
 
+/** 결제 성공: 승인 API 호출 후 성공 시 애니메이션·결제 정보·홈/주문확인 버튼 표시 */
 export default function SuccessPage() {
   const [isConfirmed, setIsConfirmed] = useState(false)
   const [showThankYou, setShowThankYou] = useState(false)

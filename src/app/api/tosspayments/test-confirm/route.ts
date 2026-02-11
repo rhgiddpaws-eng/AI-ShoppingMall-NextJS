@@ -1,0 +1,72 @@
+// =============================================================================
+// 테스트 결제 승인 API - POST /api/tosspayments/test-confirm
+// 실제 결제 없이 주문/결제 레코드만 생성 (개발·테스트용)
+// =============================================================================
+
+import { NextResponse } from 'next/server'
+import prismaClient from '@/lib/prismaClient'
+import { OrderStatus, PaymentStatus } from '@prisma/client'
+import { getSession } from '@/lib/ironSessionControl'
+import { CartItem } from '@/lib/cart'
+
+export async function POST(req: Request) {
+  try {
+    const { amount, data } = await req.json()
+
+    const session = await getSession()
+    if (!session?.id) {
+      return NextResponse.json(
+        { message: '로그인이 필요합니다.' },
+        { status: 401 }
+      )
+    }
+
+    const parsedData = typeof data === 'string' ? JSON.parse(data) : data
+    const totalAmount = Number(amount) || 0
+    if (!parsedData?.cart?.length || totalAmount <= 0) {
+      return NextResponse.json(
+        { message: '주문 정보가 올바르지 않습니다.' },
+        { status: 400 }
+      )
+    }
+
+    const testOrderId = `test-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+
+    await prismaClient.$transaction(async (prisma) => {
+      await prisma.order.create({
+        data: {
+          totalAmount,
+          status: OrderStatus.PAID,
+          userId: session.id,
+          items: {
+            create: parsedData.cart.map((item: CartItem) => ({
+              productId: +item.id,
+              quantity: item.quantity,
+              price: item.price,
+            })),
+          },
+          payment: {
+            create: {
+              paymentMethod: '테스트',
+              amount: totalAmount,
+              transactionId: testOrderId,
+              paymentOrderId: testOrderId,
+              status: PaymentStatus.PAID,
+            },
+          },
+        },
+      })
+    })
+
+    return NextResponse.json({ message: '테스트 결제 완료' })
+  } catch (error) {
+    console.error('테스트 결제 처리 오류:', error)
+    return NextResponse.json(
+      {
+        message: '테스트 결제 처리 중 오류가 발생했습니다.',
+        error: error instanceof Error ? error.message : '알 수 없는 오류',
+      },
+      { status: 500 }
+    )
+  }
+}

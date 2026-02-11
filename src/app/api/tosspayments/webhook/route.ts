@@ -1,8 +1,14 @@
+// =============================================================================
+// 토스페이먼츠 웹훅 API - POST /api/tosspayments/webhook
+// 결제 상태 변경 이벤트(PAYMENT_STATUS_CHANGED) 수신 시 Order/Payment 상태 업데이트
+// =============================================================================
+
 import { NextRequest } from 'next/server'
 import prismaClient from '@/lib/prismaClient'
 import { OrderStatus, PaymentStatus } from '@prisma/client'
 
 export async function POST(req: NextRequest) {
+  
   const body = await req.json()
 
   console.log('body in tosspayments webhook route:', body)

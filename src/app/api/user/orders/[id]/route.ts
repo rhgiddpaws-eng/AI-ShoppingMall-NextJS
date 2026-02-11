@@ -1,6 +1,12 @@
+// =============================================================================
+// 사용자 주문 상세 API - GET /api/user/orders/[id]
+// 로그인 사용자 본인 주문만 ID로 조회
+// =============================================================================
+
 import { NextResponse } from 'next/server'
 import prismaClient from '@/lib/prismaClient'
 import { getSession } from '@/lib/ironSessionControl'
+import { getCdnUrl } from '@/lib/cdn'
 
 export async function GET(
   request: Request,
@@ -68,7 +74,7 @@ export async function GET(
         ...item,
         product: {
           ...item.product,
-          imageSrc: item.product.images?.[0]?.thumbnail || '/placeholder.svg',
+          imageSrc: getCdnUrl(item.product.images?.[0]?.thumbnail) || '/placeholder.svg',
         },
       })),
     }
