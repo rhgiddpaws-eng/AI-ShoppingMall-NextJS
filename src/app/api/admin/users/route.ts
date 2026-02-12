@@ -74,16 +74,17 @@ const users = [
 ]
 
 export async function GET(request: Request) {
-  const auth = await requireAdminSession()
+  const auth = await requireAdminSession(request)
   if ("error" in auth) return auth.error
   const { searchParams } = new URL(request.url)
   const search = searchParams.get("search")?.toLowerCase()
 
   // 검색어가 있으면 필터링, 없으면 전체 반환
+  type UserRow = (typeof users)[number]
   let filteredUsers = users
   if (search) {
     filteredUsers = users.filter(
-      (user) => user.name.toLowerCase().includes(search) || user.email.toLowerCase().includes(search),
+      (user: UserRow) => user.name.toLowerCase().includes(search) || user.email.toLowerCase().includes(search),
     )
   }
 

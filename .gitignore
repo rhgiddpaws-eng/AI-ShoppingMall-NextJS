@@ -10,9 +10,6 @@
 !.yarn/releases
 !.yarn/versions
 
-# testing
-/coverage
-
 # next.js
 /.next/
 /out/
@@ -20,24 +17,41 @@
 # production
 /build
 
-# misc
-.DS_Store
-*.pem
+# testing
+/coverage
 
-# debug
+# env (allow only .env.host for local DB etc.)
+.env*
+!.env.host
+
+# debug / logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
-!.env.host
+# misc
+.DS_Store
+*.pem
+*.tsbuildinfo
+next-env.d.ts
 
 # vercel
 .vercel
 
-# typescript
-*.tsbuildinfo
-next-env.d.ts
+# -----------------------------------------------------------------------------
+# 로컬 전용 / 업로드 불필요
+# -----------------------------------------------------------------------------
+# 자료 폴더 (저장소에 올리지 않음)
+기타자료/
 
+# Playwright MCP 로그
+.playwright-mcp/
+
+# 로컬 터널링 바이너리
+ngrok
+ngrok.exe
+
+# 스크립트 산출물 (이미지·임시 데이터 등)
+scripts/products_before/
+scripts/products/

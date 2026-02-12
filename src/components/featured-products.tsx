@@ -36,6 +36,7 @@ import { Button } from '@/components/ui/button'
 import ProductCard from '@/components/product-card'
 import { apiRoutes } from '@/lib/apiRoutes'
 import { getCdnUrl } from '@/lib/cdn'
+import { safeParseJson } from '@/lib/utils'
 
 interface ProductData {
   id: number
@@ -85,7 +86,7 @@ export function FeaturedProducts() {
           return
         }
 
-        const raw = await response.json()
+        const raw = await safeParseJson<unknown>(response)
         const products: ProductData[] = Array.isArray(raw) ? raw : []
 
         // 현재 날짜 기준 일주일 전 계산

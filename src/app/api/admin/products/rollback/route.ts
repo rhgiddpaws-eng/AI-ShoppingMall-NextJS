@@ -19,7 +19,7 @@ const s3Client = new S3Client({
 const BUCKET = process.env.AWS_BUCKET_NAME!
 
 export async function POST(request: NextRequest) {
-  const auth = await requireAdminSession()
+  const auth = await requireAdminSession(request)
   if ("error" in auth) return auth.error
 
   try {
@@ -38,8 +38,9 @@ export async function POST(request: NextRequest) {
         distinct: ["productId"],
       })
       if (withOrders.length > 0) {
+        type OrderItemRow = (typeof withOrders)[number]
         return NextResponse.json(
-          { error: "주문에 포함된 상품은 롤백할 수 없습니다.", productIds: withOrders.map((o) => o.productId) },
+          { error: "주문에 포함된 상품은 롤백할 수 없습니다.", productIds: withOrders.map((o: OrderItemRow) => o.productId) },
           { status: 400 }
         )
       }
@@ -50,7 +51,7 @@ export async function POST(request: NextRequest) {
 
     if (cdnKeys.length > 0 && BUCKET) {
       await Promise.all(
-        cdnKeys.map((key) =>
+        cdnKeys.map((key: string) =>
           s3Client.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key }))
         )
       )

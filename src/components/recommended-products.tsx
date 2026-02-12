@@ -27,6 +27,7 @@
 
 import { useState, useEffect } from "react"
 import ProductCard from "@/components/product-card"
+import { safeParseJson } from "@/lib/utils"
 
 interface Product {
   id: string | number
@@ -54,12 +55,12 @@ export function RecommendedProducts({ currentProductId }: RecommendedProductsPro
         const response = await fetch(`/api/products/recommended?exclude=${currentProductId}`)
         
         if (!response.ok) {
-          const errorData = await response.json()
-          throw new Error(errorData.error || "추천 상품을 불러오는데 실패했습니다")
+          const errorData = await safeParseJson<{ error?: string }>(response)
+          throw new Error(errorData?.error || "추천 상품을 불러오는데 실패했습니다")
         }
         
-        const data = await response.json()
-        setRecommendedProducts(data)
+        const data = await safeParseJson<Product[]>(response)
+        if (data) setRecommendedProducts(data)
       } catch (error) {
         console.error("추천 상품 로딩 오류:", error)
         setError(error instanceof Error ? error.message : "추천 상품을 불러오는데 실패했습니다")

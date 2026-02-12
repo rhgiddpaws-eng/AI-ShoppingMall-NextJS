@@ -5,12 +5,13 @@
 // =============================================================================
 
 import { useSearchParams } from 'next/navigation'
+import { useAuthStore } from '@/lib/store'
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import dynamic from 'next/dynamic'
 
-// 클라이언트 사이드에서만 로드될 수 있도록 동적 임포트
-const Lottie = dynamic(() => import('react-lottie'), { ssr: false })
+// lottie-react: URL에서 JSON 로드 후 animationData로 사용 (SSR 회피)
+const Lottie = dynamic(() => import('lottie-react'), { ssr: false })
 
 // confetti 함수로 정확히 가져오기
 const getConfetti = async () => {
@@ -18,16 +19,23 @@ const getConfetti = async () => {
   return confettiModule.default;
 };
 
-// LottieFiles에서 제공하는 공개 애니메이션 사용
-const thankYouAnimation =
+// Lottie JSON URL (lottie-react는 animationData 객체 사용, useEffect에서 fetch)
+const thankYouAnimationUrl =
   'https://assets10.lottiefiles.com/packages/lf20_touohxv0.json'
-const successAnimation =
+const successAnimationUrl =
   'https://assets2.lottiefiles.com/private_files/lf30_rysgr4xj.json'
+
+/** Lottie JSON 타입 */
+type LottieAnimationData = object | null
 
 /** 결제 성공: 승인 API 호출 후 성공 시 애니메이션·결제 정보·홈/주문확인 버튼 표시 */
 export default function SuccessPage() {
   const [isConfirmed, setIsConfirmed] = useState(false)
   const [showThankYou, setShowThankYou] = useState(false)
+  const [successAnimationData, setSuccessAnimationData] =
+    useState<LottieAnimationData>(null)
+  const [thankYouAnimationData, setThankYouAnimationData] =
+    useState<LottieAnimationData>(null)
   const searchParams = useSearchParams()
   const paymentKey = searchParams.get('paymentKey')
   const orderId = searchParams.get('orderId')
@@ -35,6 +43,23 @@ export default function SuccessPage() {
   const data = searchParams.get('data')
 
   console.log('data:', data)
+
+  // Lottie JSON 로드 (클라이언트에서 URL fetch)
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const [successRes, thankYouRes] = await Promise.all([
+          fetch(successAnimationUrl),
+          fetch(thankYouAnimationUrl),
+        ])
+        if (successRes.ok) setSuccessAnimationData(await successRes.json())
+        if (thankYouRes.ok) setThankYouAnimationData(await thankYouRes.json())
+      } catch {
+        // 외부 URL 실패 시 무시
+      }
+    }
+    load()
+  }, [])
 
   // 폭죽 효과 설정 - useEffect 내부로 이동
   useEffect(() => {
@@ -89,10 +114,13 @@ export default function SuccessPage() {
     // 로딩 효과를 위해 약간의 지연 추가
     await new Promise(resolve => setTimeout(resolve, 800))
 
+    const token = useAuthStore.getState().token
     const response = await fetch('/api/tosspayments/confirm', {
       method: 'POST',
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       body: JSON.stringify({
         paymentKey,
@@ -104,27 +132,11 @@ export default function SuccessPage() {
 
     if (response.ok) {
       setIsConfirmed(true)
+    } else {
+      const json = await response.json().catch(() => ({}))
+      const message = json?.message || '결제 승인에 실패했습니다. 로그인 후 다시 시도해 주세요.'
+      alert(message)
     }
-  }
-
-  const thankYouOptions = {
-    loop: false,
-    autoplay: true,
-    animationData: null,
-    rendererSettings: {
-      preserveAspectRatio: 'xMidYMid slice',
-    },
-    path: thankYouAnimation,
-  }
-
-  const successOptions = {
-    loop: false,
-    autoplay: true,
-    animationData: null,
-    rendererSettings: {
-      preserveAspectRatio: 'xMidYMid slice',
-    },
-    path: successAnimation,
   }
 
   return (
@@ -202,7 +214,13 @@ export default function SuccessPage() {
             transition={{ duration: 0.8 }}
           >
             <div className="success-animation-container">
-              <Lottie options={successOptions} height={180} width={180} />
+              {successAnimationData && (
+                <Lottie
+                  animationData={successAnimationData}
+                  loop={false}
+                  style={{ width: 180, height: 180 }}
+                />
+              )}
             </div>
 
             <motion.h1
@@ -223,7 +241,13 @@ export default function SuccessPage() {
                   exit={{ opacity: 0 }}
                   transition={{ duration: 0.5 }}
                 >
-                  <Lottie options={thankYouOptions} height={150} width={300} />
+                  {thankYouAnimationData && (
+                    <Lottie
+                      animationData={thankYouAnimationData}
+                      loop={false}
+                      style={{ width: 300, height: 150 }}
+                    />
+                  )}
                   <motion.p
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}

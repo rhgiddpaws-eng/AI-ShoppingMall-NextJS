@@ -1,17 +1,20 @@
 // =============================================================================
 // 로그인 API - POST /api/login
-// 이메일·비밀번호 검증, DB 사용자 조회·비밀번호 확인, 세션 생성 후 사용자 정보 반환
+// 이메일·비밀번호 검증, DB 사용자 조회·비밀번호 확인, 세션 생성 + JWT 발급 후 사용자 정보 반환
 // =============================================================================
 
 import { getSession } from '@/lib/ironSessionControl'
+import { signJwt } from '@/lib/jwt'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import * as argon2 from 'argon2'
 import prismaClient from '@/lib/prismaClient'
+
 export type LoginResponse = {
   ok: boolean
   message?: string
   error?: string
+  token?: string
   user?: {
     id: number
     name?: string
@@ -74,9 +77,17 @@ export async function POST(request: Request) {
     session.isLoggedIn = true
     await session.save()
 
+    const token = await signJwt({
+      sub: String(user.id),
+      email: user.email,
+      name: user.name ?? undefined,
+      role: String(user.role),
+    })
+
     return NextResponse.json<LoginResponse>({
       ok: true,
       message: '로그인 성공',
+      token,
       user: {
         id: user.id,
         name: user.name ?? undefined,

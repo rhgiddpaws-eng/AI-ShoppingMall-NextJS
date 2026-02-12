@@ -27,6 +27,7 @@ const cdnHostname = (() => {
 })()
 
 const nextConfig: NextConfig = {
+  serverExternalPackages: ['@prisma/client', 'prisma', '.prisma/client'],
   images: {
     remotePatterns: [
       {

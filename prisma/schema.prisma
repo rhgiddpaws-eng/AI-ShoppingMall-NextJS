@@ -5,8 +5,9 @@
 // Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
 generator client {
   provider        = "prisma-client-js"
+  output          = "../node_modules/.prisma/client"
   previewFeatures = ["postgresqlExtensions"]
-  binaryTargets   = ["native", "debian-openssl-3.0.x", "rhel-openssl-3.0.x"]
+  binaryTargets   = ["native", "debian-openssl-3.0.x", "rhel-openssl-3.0.x", "windows"]
 }
 
 datasource db {
@@ -128,14 +129,26 @@ model Image {
   productId Int?
 }
 
+enum DeliveryStatus {
+  ORDER_COMPLETE  // 주문완료
+  PREPARING       // 배송준비
+  IN_DELIVERY     // 배달중
+  ARRIVING        // 도착중
+  DELIVERED       // 배달완료
+}
+
 model Order {
-  id          Int         @id @default(autoincrement())
-  user        User        @relation(fields: [userId], references: [id])
-  userId      Int
-  totalAmount Float
-  status      OrderStatus
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  id              Int             @id @default(autoincrement())
+  user            User            @relation(fields: [userId], references: [id])
+  userId          Int
+  totalAmount     Float
+  status          OrderStatus
+  deliveryStatus  DeliveryStatus? @default(ORDER_COMPLETE) // 배달 추적
+  shippingAddress String?         // 배송지 주소 (지도/배달용)
+  shippingLat     Float?          // 배송지 위도 (네이버 지도)
+  shippingLng     Float?          // 배송지 경도
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
 
   // 관계
   items     OrderItem[]

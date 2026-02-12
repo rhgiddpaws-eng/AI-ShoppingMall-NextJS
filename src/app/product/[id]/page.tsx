@@ -83,7 +83,7 @@ export default function ProductPage() {
   const handleAddToCart = () => {
     if (!product) return
 
-    addToCart({
+    const added = addToCart({
       id: product.id.toString(),
       name: product.name,
       price: product.price,
@@ -94,7 +94,7 @@ export default function ProductPage() {
       quantity: 1,
       category: product.category || '기타',
     })
-    toast.success(`${product.name}이(가) 장바구니에 추가되었습니다.`)
+    if (added) toast.success(`${product.name}이(가) 장바구니에 추가되었습니다.`)
   }
 
   const handleToggleWishlist = () => {
@@ -105,7 +105,7 @@ export default function ProductPage() {
       setIsWishlisted(false)
       toast.success(`${product.name}이(가) 위시리스트에서 제거되었습니다.`)
     } else {
-      addToWishlist({
+      const added = addToWishlist({
         id: product.id.toString(),
         name: product.name,
         price: product.price,
@@ -115,8 +115,10 @@ export default function ProductPage() {
             : '/placeholder.svg',
         category: product.category || '기타',
       })
-      setIsWishlisted(true)
-      toast.success(`${product.name}이(가) 위시리스트에 추가되었습니다.`)
+      if (added) {
+        setIsWishlisted(true)
+        toast.success(`${product.name}이(가) 위시리스트에 추가되었습니다.`)
+      }
     }
   }
 
@@ -182,7 +184,7 @@ export default function ProductPage() {
         </div>
 
         <div>
-          <h1 className="text-3xl font-bold mb-2">{product.name}</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold mb-2 line-clamp-2 break-words min-w-0">{product.name}</h1>
 
           {product.discountRate > 0 ? (
             <div className="mb-4">
@@ -203,7 +205,7 @@ export default function ProductPage() {
           )}
 
           <p className="mb-6">
-            {product.description || '상품 설명이 없습니다.'}
+            <span className="break-words">{product.description || '상품 설명이 없습니다.'}</span>
           </p>
 
           <div className="mb-4">

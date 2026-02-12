@@ -5,8 +5,7 @@
  * - 로그인 사용자: GET /api/user/cart, /api/user/wishlist 로 
  * - 서버에서 조회·갱신. 추가/삭제/수량 변경 시 API 호출 후 응답으로 스토어 갱신.
  * 
- * - 비로그인 사용자: API 401 시 로컬(persist) 상태로 fallback. 
- * - localStorage 키 'shop-storage'로 유지.
+ * - 비로그인 사용자: 장바구니/위시리스트 추가 불가(로그인 유도 토스트). 노출은 비움(ShopContext).
  * - fetchCart/fetchWishlist: ShopProvider에서 로그인 시 한 번 호출해 
  * - 서버 데이터로 스토어 채움.
  *
@@ -18,6 +17,7 @@
 
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { toast } from 'sonner'
 import type { CartItem } from './cart'
 import type { WishlistItem } from './wishlist'
 import { LoginResponse } from '@/app/api/login/route'
@@ -26,7 +26,25 @@ import { logout } from './ironSessionControl'
 
 const cartPath = apiRoutes.routes.user.routes.cart.path
 const wishlistPath = apiRoutes.routes.user.routes.wishlist.path
-const fetchOpts: RequestInit = { credentials: 'include' }
+
+/** 응답이 JSON이 아닐 때(HTML 에러 페이지 등) JSON 파싱 오류 방지 */
+async function safeJson<T>(res: Response): Promise<T | null> {
+  const ct = res.headers.get('content-type') ?? ''
+  if (!ct.includes('application/json')) return null
+  try {
+    return (await res.json()) as T
+  } catch {
+    return null
+  }
+}
+
+/** 인증이 필요한 fetch 시 사용. JWT 있으면 Authorization 헤더 추가 */
+function authFetchOpts(extra: RequestInit = {}): RequestInit {
+  const token = typeof window !== 'undefined' ? useAuthStore.getState().token : null
+  const headers: Record<string, string> = { ...(extra.headers as Record<string, string>) }
+  if (token) headers['Authorization'] = `Bearer ${token}`
+  return { credentials: 'include', ...extra, headers }
+}
 
 /**
    * addToWishlist:
@@ -43,11 +61,11 @@ interface ShopState {
   setWishlist: (wishlist: WishlistItem[]) => void
   fetchCart: () => Promise<void>
   fetchWishlist: () => Promise<void>
-  addToCart: (item: CartItem) => void | Promise<void>
+  addToCart: (item: CartItem) => boolean
   removeFromCart: (id: string) => void | Promise<void>
   updateCartItemQuantity: (id: string, quantity: number) => void | Promise<void>
   clearCart: () => void | Promise<void>
-  addToWishlist: (item: WishlistItem) => void | Promise<void>
+  addToWishlist: (item: WishlistItem) => boolean
   removeFromWishlist: (id: string) => void | Promise<void>
   clearWishlist: () => void | Promise<void>
   isInWishlist: (id: string) => boolean
@@ -63,39 +81,42 @@ export const useShopStore = create(
       setWishlist: wishlist => set({ wishlist }),
       fetchCart: async () => {
         try {
-          const res = await fetch(cartPath, fetchOpts)
+          const res = await fetch(cartPath, authFetchOpts())
           if (!res.ok) return
-          const data = (await res.json()) as { cart: CartItem[] }
-          set({ cart: data.cart ?? [] })
+          const data = await safeJson<{ cart: CartItem[] }>(res)
+          if (data?.cart) set({ cart: data.cart })
         } catch (e) {
           console.error('fetchCart:', e)
         }
       },
       fetchWishlist: async () => {
         try {
-          const res = await fetch(wishlistPath, fetchOpts)
+          const res = await fetch(wishlistPath, authFetchOpts())
           if (!res.ok) return
-          const data = (await res.json()) as { wishlist: WishlistItem[] }
-          set({ wishlist: data.wishlist ?? [] })
+          const data = await safeJson<{ wishlist: WishlistItem[] }>(res)
+          if (data?.wishlist) set({ wishlist: data.wishlist })
         } catch (e) {
           console.error('fetchWishlist:', e)
         }
       },
       addToCart: item => {
+        if (!useAuthStore.getState().user) {
+          toast.info('장바구니는 로그인 후 이용할 수 있습니다.')
+          return false
+        }
         const state = get()
         const existing = state.cart.find(i => i.id === item.id)
         const quantity = existing ? existing.quantity + 1 : 1
         ;(async () => {
           try {
-            const res = await fetch(cartPath, {
-              ...fetchOpts,
+            const res = await fetch(cartPath, authFetchOpts({
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ productId: Number(item.id), quantity }),
-            })
+            }))
             if (res.ok) {
-              const data = (await res.json()) as { cart: CartItem[] }
-              set({ cart: data.cart ?? [] })
+const data = await safeJson<{ cart: CartItem[] }>(res)
+              if (data?.cart) set({ cart: data.cart })
               return
             }
           } catch (e) {
@@ -113,17 +134,15 @@ export const useShopStore = create(
             return { cart: [...s.cart, item] }
           })
         })()
+        return true
       },
       removeFromCart: id => {
         ;(async () => {
           try {
-            const res = await fetch(`${cartPath}?productId=${id}`, {
-              ...fetchOpts,
-              method: 'DELETE',
-            })
+            const res = await fetch(`${cartPath}?productId=${id}`, authFetchOpts({ method: 'DELETE' }))
             if (res.ok) {
-              const data = (await res.json()) as { cart: CartItem[] }
-              set({ cart: data.cart ?? [] })
+const data = await safeJson<{ cart: CartItem[] }>(res)
+              if (data?.cart) set({ cart: data.cart })
               return
             }
           } catch (e) {
@@ -135,15 +154,14 @@ export const useShopStore = create(
       updateCartItemQuantity: (id, quantity) => {
         ;(async () => {
           try {
-            const res = await fetch(cartPath, {
-              ...fetchOpts,
+            const res = await fetch(cartPath, authFetchOpts({
               method: 'PATCH',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ productId: Number(id), quantity }),
-            })
+            }))
             if (res.ok) {
-              const data = (await res.json()) as { cart: CartItem[] }
-              set({ cart: data.cart ?? [] })
+const data = await safeJson<{ cart: CartItem[] }>(res)
+              if (data?.cart) set({ cart: data.cart })
               return
             }
           } catch (e) {
@@ -159,10 +177,10 @@ export const useShopStore = create(
       clearCart: () => {
         ;(async () => {
           try {
-            const res = await fetch(cartPath, { ...fetchOpts, method: 'DELETE' })
+            const res = await fetch(cartPath, authFetchOpts({ method: 'DELETE' }))
             if (res.ok) {
-              const data = (await res.json()) as { cart: CartItem[] }
-              set({ cart: data.cart ?? [] })
+const data = await safeJson<{ cart: CartItem[] }>(res)
+              if (data?.cart) set({ cart: data.cart })
               return
             }
           } catch (e) {
@@ -172,17 +190,20 @@ export const useShopStore = create(
         })()
       },
       addToWishlist: item => {
+        if (!useAuthStore.getState().user) {
+          toast.info('위시리스트는 로그인 후 이용할 수 있습니다.')
+          return false
+        }
         ;(async () => {
           try {
-            const res = await fetch(wishlistPath, {
-              ...fetchOpts,
+            const res = await fetch(wishlistPath, authFetchOpts({
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ productId: Number(item.id) }),
-            })
+            }))
             if (res.ok) {
-              const data = (await res.json()) as { wishlist: WishlistItem[] }
-              set({ wishlist: data.wishlist ?? [] })
+              const data = await safeJson<{ wishlist: WishlistItem[] }>(res)
+              if (data?.wishlist) set({ wishlist: data.wishlist })
               return
             }
           } catch (e) {
@@ -195,17 +216,15 @@ export const useShopStore = create(
             return s
           })
         })()
+        return true
       },
       removeFromWishlist: id => {
         ;(async () => {
           try {
-            const res = await fetch(`${wishlistPath}?productId=${id}`, {
-              ...fetchOpts,
-              method: 'DELETE',
-            })
+            const res = await fetch(`${wishlistPath}?productId=${id}`, authFetchOpts({ method: 'DELETE' }))
             if (res.ok) {
-              const data = (await res.json()) as { wishlist: WishlistItem[] }
-              set({ wishlist: data.wishlist ?? [] })
+              const data = await safeJson<{ wishlist: WishlistItem[] }>(res)
+              if (data?.wishlist) set({ wishlist: data.wishlist })
               return
             }
           } catch (e) {
@@ -219,10 +238,10 @@ export const useShopStore = create(
       clearWishlist: () => {
         ;(async () => {
           try {
-            const res = await fetch(wishlistPath, { ...fetchOpts, method: 'DELETE' })
+            const res = await fetch(wishlistPath, authFetchOpts({ method: 'DELETE' }))
             if (res.ok) {
-              const data = (await res.json()) as { wishlist: WishlistItem[] }
-              set({ wishlist: data.wishlist ?? [] })
+              const data = await safeJson<{ wishlist: WishlistItem[] }>(res)
+              if (data?.wishlist) set({ wishlist: data.wishlist })
               return
             }
           } catch (e) {
@@ -239,17 +258,20 @@ export const useShopStore = create(
 
 interface AuthState {
   user: { id: number; name?: string; email: string; role?: string } | null
+  token: string | null
   isLoading: boolean
   isHydrated: boolean
   login: (email: string, password: string) => Promise<boolean>
+  setAuthFromSession: () => Promise<boolean>
   logout: () => void
 }
 
-/** 인증 전역 스토어. localStorage 키 'auth-storage'로 persist */
+/** 인증 전역 스토어. localStorage 키 'auth-storage'로 persist. JWT token 저장 후 API 요청 시 Authorization 헤더로 전송 */
 export const useAuthStore = create(
   persist<AuthState>(
     set => ({
       user: null,
+      token: null,
       isLoading: false,
       isHydrated: false,
       login: async (email, password) => {
@@ -257,20 +279,37 @@ export const useAuthStore = create(
         try {
           const data = await fetchLogin(email, password)
           if (data.ok) {
-            set({ user: data.user, isLoading: false })
+            set({ user: data.user, token: data.token ?? null, isLoading: false })
             return true
           } else {
-            set({ user: null, isLoading: false })
+            set({ user: null, token: null, isLoading: false })
             return false
           }
         } catch (error) {
           console.error('Login failed:', error)
-          set({ user: null, isLoading: false })
+          set({ user: null, token: null, isLoading: false })
+          return false
+        }
+      },
+      setAuthFromSession: async () => {
+        try {
+          const res = await fetch('/api/auth/me', { credentials: 'include' })
+          const data = await safeJson<{ ok?: boolean; user?: AuthState['user']; token?: string }>(res)
+          if (data?.ok && data.user && data.token) {
+            set({ user: data.user, token: data.token })
+            return true
+          }
+          return false
+        } catch (e) {
+          console.error('setAuthFromSession:', e)
           return false
         }
       },
       logout: () => {
-        set({ user: null })
+        set({ user: null, token: null })
+        /** 로그아웃 시 장바구니·위시리스트도 비움(나의 정보가 없으므로 노출하지 않음) */
+        useShopStore.getState().setCart([])
+        useShopStore.getState().setWishlist([])
         /** 서버 세션(쿠키)도 삭제 */
         logout()
       },
@@ -298,6 +337,9 @@ export async function fetchLogin(email: string, password: string) {
     credentials: 'include',
     body: JSON.stringify({ email, password }),
   })
-  const data = (await response.json()) as LoginResponse
+  const data = await safeJson<LoginResponse>(response)
+  if (!data) {
+    return { ok: false, error: '서버 응답이 올바르지 않습니다.' } as LoginResponse
+  }
   return data
 }

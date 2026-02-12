@@ -11,11 +11,12 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import CartItem from "@/components/cart-item"
-import { useShopStore } from "@/lib/store"
+import { useShopStore, useAuthStore } from "@/lib/store"
 
 /** 장바구니: 상품 목록, 주문 요약(5만원 이상 무료배송), 결제하기 이동 */
 export default function CartPage() {
   const { cart } = useShopStore()
+  const { user } = useAuthStore()
   const router = useRouter()
 
   const totalAmount = cart.reduce((total, item) => total + item.price * item.quantity, 0)
@@ -61,6 +62,12 @@ export default function CartPage() {
           </Button>
           <h1 className="text-2xl font-bold">장바구니</h1>
         </div>
+
+        {user === undefined ? null : !user ? (
+          <p className="text-sm text-muted-foreground mb-4 rounded-md bg-muted/50 p-3">
+            비로그인 시 장바구니는 이 기기에서만 저장됩니다. 로그인하면 서버에 저장되어 다른 기기에서도 볼 수 있습니다.
+          </p>
+        ) : null}
 
         <div className="mb-8">
           {cart.map((item) => (

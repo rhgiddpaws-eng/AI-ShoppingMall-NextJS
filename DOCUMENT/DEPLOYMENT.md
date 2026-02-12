@@ -91,7 +91,7 @@ EC2 한 대를 빌려서 현재 docker-compose로 앱 + Postgres + nginx를 실�
 ### 2.1 사전 조건
 
 - EC2 인스턴스 1대 (Ubuntu 22.04 등)
-- 도메인: 예) `ecommerce.yes.monster` → EC2 **퍼블릭 IP** (또는 Elastic IP)로 A 레코드 설정
+- 도메인: 예) `ecommerce.ott.shop` → EC2 **퍼블릭 IP** (또는 Elastic IP)로 A 레코드 설정
 - 보안 그룹: **22(SSH), 80, 443** 인바운드 허용
 
 ---
@@ -130,17 +130,17 @@ sudo usermod -aG docker $USER
 ```bash
 apt-get update
 apt-get install certbot python3-certbot-nginx
-certbot certonly --webroot -w /usr/share/nginx/html -d ecommerce.yes.monster --email milli@molluhub.com --agree-tos --no-eff-email
+certbot certonly --webroot -w /usr/share/nginx/html -d ecommerce.ott.shop --email milli@molluhub.com --agree-tos --no-eff-email
 ```
 
 ```bash
-root@d0d44d21e87a:/# certbot certonly --webroot -w /usr/share/nginx/html -d ecommerce.yes.monster --email milli@molluhub.com --agree-tos --no-eff-email
+root@d0d44d21e87a:/# certbot certonly --webroot -w /usr/share/nginx/html -d ecommerce.ott.shop --email milli@molluhub.com --agree-tos --no-eff-email
 Saving debug log to /var/log/letsencrypt/letsencrypt.log
-Requesting a certificate for ecommerce.yes.monster
+Requesting a certificate for ecommerce.ott.shop
 
 Successfully received certificate.
-Certificate is saved at: /etc/letsencrypt/live/ecommerce.yes.monster/fullchain.pem
-Key is saved at:         /etc/letsencrypt/live/ecommerce.yes.monster/privkey.pem
+Certificate is saved at: /etc/letsencrypt/live/ecommerce.ott.shop/fullchain.pem
+Key is saved at:         /etc/letsencrypt/live/ecommerce.ott.shop/privkey.pem
 This certificate expires on 2025-06-11.
 These files will be updated when the certificate renews.
 Certbot has set up a scheduled task to automatically renew this certificate in the background.
@@ -155,37 +155,38 @@ If you like Certbot, please consider supporting our work by:
 
 ### 2.4 Let's Encrypt 인증서 발급 (nginx 기동 전에 한 번)
 
-nginx가 80 포트를 쓰기 전에, **80 포트로 certbot**을 사용해 인증서를 먼저 받습니다.
+**방법 A: Docker로 발급 (권장)** — 호스트에 certbot 설치 불필요
+
+- 도메인 `ncott.shop` 이 이 서버(80 포트)를 가리켜야 합니다.
+- nginx는 아직 기동하지 않은 상태에서 아래 스크립트를 실행합니다.
+
+```bash
+cd docker-compose/nginx
+# 이메일 지정(선택): export CERTBOT_EMAIL=your@email.com
+chmod +x obtain-cert.sh
+./obtain-cert.sh
+```
+
+- 스크립트가 nginx를 잠시 중지 → certbot 컨테이너로 인증서 발급 → 인증서를 `letsencrypt_data` 볼륨에 저장 → nginx 재기동합니다.
+- 이후 nginx는 해당 볼륨의 `/etc/letsencrypt/live/ncott.shop/` 인증서를 읽습니다.
+
+**방법 B: 호스트에서 certbot 직접 실행**
 
 ```bash
 # certbot 설치 (Ubuntu)
 sudo apt-get install -y certbot
-
 # 도메인으로 인증서 발급 (80 포트 사용 → 이때는 nginx 미기동 상태)
-sudo certbot certonly --standalone -d ecommerce.yes.monster
-# 이메일 입력, 약관 동의 후 발급됨
-# 인증서 위치: /etc/letsencrypt/live/ecommerce.yes.monster/fullchain.pem, privkey.pem
+sudo certbot certonly --standalone -d ncott.shop
 ```
 
-발급 후 nginx 설정에서 사용하는 경로가 `/etc/letsencrypt/live/ecommerce.yes.monster/` 이므로, **nginx 컨테이너에서 이 경로를 읽을 수 있게** 볼륨으로 마운트해야 합니다.
+- 방법 B를 쓰면 nginx-compose에서 호스트 경로 `/etc/letsencrypt` 를 마운트하도록 설정해야 합니다 (기존 2.5 참고).
 
 ---
 
-### 2.5 nginx-compose에 Let's Encrypt 볼륨 마운트 추가
+### 2.5 nginx-compose와 Let's Encrypt
 
-**파일**: `docker-compose/nginx/nginx-compose.yml`
-
-`volumes` 에 다음 한 줄 추가:
-
-```yaml
-volumes:
-  - ./conf.d:/etc/nginx/conf.d
-  - ./nginx.conf:/etc/nginx/nginx.conf
-  # Let's Encrypt 인증서 (EC2 호스트에서 certbot으로 발급한 경로)
-  - /etc/letsencrypt:/etc/letsencrypt:ro
-```
-
-`:ro` 는 읽기 전용 마운트입니다.
+- **방법 A 사용 시**: `nginx-compose.yml` 에 이미 `letsencrypt_data` 볼륨이 정의되어 있고, certbot 서비스가 이 볼륨에 인증서를 씁니다. nginx(webserver)는 같은 볼륨을 읽기 전용으로 마운트합니다. 별도 호스트 경로 마운트는 필요 없습니다.
+- **방법 B 사용 시**: webserver의 volumes에서 `letsencrypt_data` 대신 `- /etc/letsencrypt:/etc/letsencrypt:ro` 로 바꾸면, 호스트에서 발급한 인증서를 nginx가 사용합니다.
 
 ---
 
@@ -283,7 +284,7 @@ volumes:
    docker compose -f nginx-compose.yml up -d
    ```
 
-이후 `https://ecommerce.yes.monster` 로 접속해 동작 확인.
+이후 `https://ecommerce.ott.shop` 로 접속해 동작 확인.
 
 ---
 

@@ -7,7 +7,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
 import { randomUUID } from 'crypto'
-import { getSession } from '@/lib/ironSessionControl'
+import { getAuthFromRequest } from '@/lib/authFromRequest'
 
 const s3Client = new S3Client({
   region: process.env.AWS_REGION,
@@ -27,8 +27,8 @@ const ALLOWED_VIDEO_TYPES = ['video/mp4', 'video/webm', 'video/quicktime']
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getSession()
-    if (!session?.id || !session.isLoggedIn) {
+    const auth = await getAuthFromRequest(request)
+    if (!auth?.id) {
       return NextResponse.json({ error: '인증이 필요합니다' }, { status: 401 })
     }
 
@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
     }
 
     const ext = fileType.split('/')[1]?.replace('quicktime', 'mov') || 'bin'
-    const bucketPath = `ecommerce/inquiries/${session.id}/`
+    const bucketPath = `ecommerce/inquiries/${auth.id}/`
     const key = `${bucketPath}${randomUUID()}.${ext}`
 
     const command = new PutObjectCommand({

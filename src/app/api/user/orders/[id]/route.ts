@@ -5,24 +5,18 @@
 
 import { NextResponse } from 'next/server'
 import prismaClient from '@/lib/prismaClient'
-import { getSession } from '@/lib/ironSessionControl'
+import { getAuthFromRequest } from '@/lib/authFromRequest'
 import { getCdnUrl } from '@/lib/cdn'
 
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  // 인증된 사용자 세션 가져오기
-  const preSession = await getSession()
-  const session = {
-    ...preSession,
-  }
-
-  if (!session || !session.id || !session.isLoggedIn) {
+  const auth = await getAuthFromRequest(request)
+  if (!auth?.id) {
     return NextResponse.json({ error: '인증이 필요합니다' }, { status: 401 })
   }
-
-  const userId = Number(session.id)
+  const userId = auth.id
   const orderId = Number((await params).id)
 
   if (isNaN(orderId)) {
@@ -68,9 +62,10 @@ export async function GET(
     }
 
     // 응답 데이터 가공
+    type OrderItemWithProduct = (typeof order)["items"][number]
     const formattedOrder = {
       ...order,
-      items: order.items.map(item => ({
+      items: order.items.map((item: OrderItemWithProduct) => ({
         ...item,
         product: {
           ...item.product,

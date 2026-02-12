@@ -8,11 +8,11 @@ import prismaClient from '@/lib/prismaClient'
 import { requireAdminSession } from '@/lib/requireAdminSession'
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const auth = await requireAdminSession()
-  if (auth.error) return auth.error
+  const auth = await requireAdminSession(request)
+  if ('error' in auth) return auth.error
 
   try {
     const id = Number((await params).id)
@@ -45,8 +45,8 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const auth = await requireAdminSession()
-  if (auth.error) return auth.error
+  const auth = await requireAdminSession(request)
+  if ('error' in auth) return auth.error
 
   try {
     const id = Number((await params).id)
@@ -69,7 +69,7 @@ export async function PATCH(
       data: {
         replyMessage,
         repliedAt: new Date(),
-        repliedBy: auth.session.id,
+        repliedBy: auth.auth.id, // 관리자 userId
       },
     })
 

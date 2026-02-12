@@ -9,7 +9,7 @@ import prismaClient from "@/lib/prismaClient"
 import { getCdnUrl } from "@/lib/cdn"
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const auth = await requireAdminSession()
+  const auth = await requireAdminSession(request)
   if ("error" in auth) return auth.error
   const productId = (await params).id
 
@@ -40,6 +40,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     return NextResponse.json({ error: "상품을 찾을 수 없습니다" }, { status: 404 })
   }
 
+  type ProductImage = (typeof p)["images"][number]
   const statusDisplay =
     (p as { status?: string }).status === "DRAFT" ? "임시저장" : p.stock <= 0 ? "품절" : "판매중"
   return NextResponse.json({
@@ -50,13 +51,13 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     price: p.price,
     stock: p.stock,
     status: statusDisplay,
-    images: p.images.map((img) => getCdnUrl(img.original)),
+    images: p.images.map((img: ProductImage) => getCdnUrl(img.original)),
     options: [],
   })
 }
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const auth = await requireAdminSession()
+  const auth = await requireAdminSession(request)
   if ("error" in auth) return auth.error
   const productId = (await params).id
   const id = parseInt(productId, 10)
@@ -85,7 +86,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 }
 
 export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const auth = await requireAdminSession()
+  const auth = await requireAdminSession(request)
   if ("error" in auth) return auth.error
   const productId = (await params).id
   const id = parseInt(productId, 10)

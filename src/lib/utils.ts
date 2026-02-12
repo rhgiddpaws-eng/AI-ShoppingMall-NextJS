@@ -20,3 +20,17 @@ import { twMerge } from "tailwind-merge"
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
+
+/**
+ * 응답이 JSON이 아닐 때(HTML 에러 페이지 등) JSON 파싱 오류 방지.
+ * Content-Type이 application/json이 아니거나 파싱 실패 시 null 반환.
+ */
+export async function safeParseJson<T>(res: Response): Promise<T | null> {
+  const ct = res.headers.get('content-type') ?? ''
+  if (!ct.includes('application/json')) return null
+  try {
+    return (await res.json()) as T
+  } catch {
+    return null
+  }
+}

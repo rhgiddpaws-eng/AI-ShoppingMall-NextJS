@@ -7,17 +7,17 @@
  */
 import { NextResponse } from 'next/server'
 import prismaClient from '@/lib/prismaClient'
-import { getSession } from '@/lib/ironSessionControl'
+import { getAuthFromRequest } from '@/lib/authFromRequest'
 import type { CartItem } from '@/lib/cart'
 import { getCdnUrl } from '@/lib/cdn'
 
 /** GET /api/user/cart — 로그인 사용자 장바구니 조회. Cart 없으면 생성 후 빈 배열 반환 */
-export async function GET() {
-  const session = await getSession()
-  if (!session?.id || !session.isLoggedIn) {
+export async function GET(request: Request) {
+  const auth = await getAuthFromRequest(request)
+  if (!auth?.id) {
     return NextResponse.json({ error: '인증이 필요합니다' }, { status: 401 })
   }
-  const userId = Number(session.id)
+  const userId = auth.id
 
   try {
     let cart = await prismaClient.cart.findUnique({
@@ -62,7 +62,8 @@ export async function GET() {
       })
     }
 
-    const items: CartItem[] = cart.items.map(item => ({
+    type CartItemEntry = (typeof cart)["items"][number]
+    const items: CartItem[] = cart.items.map((item: CartItemEntry) => ({
       id: String(item.productId),
       name: item.product.name,
       price: Number(item.product.price),
@@ -83,11 +84,11 @@ export async function GET() {
 
 /** POST /api/user/cart — 장바구니에 추가 또는 수량 변경. body: { productId: number, quantity?: number } */
 export async function POST(request: Request) {
-  const session = await getSession()
-  if (!session?.id || !session.isLoggedIn) {
+  const auth = await getAuthFromRequest(request)
+  if (!auth?.id) {
     return NextResponse.json({ error: '인증이 필요합니다' }, { status: 401 })
   }
-  const userId = Number(session.id)
+  const userId = auth.id
 
   let body: { productId: number; quantity?: number }
   try {
@@ -136,7 +137,8 @@ export async function POST(request: Request) {
       },
     })
 
-    const items: CartItem[] = (updated?.items ?? []).map(item => ({
+    type CartItemEntry = NonNullable<typeof updated>["items"][number]
+    const items: CartItem[] = (updated?.items ?? []).map((item: CartItemEntry) => ({
       id: String(item.productId),
       name: item.product.name,
       price: Number(item.product.price),
@@ -157,11 +159,11 @@ export async function POST(request: Request) {
 
 /** DELETE /api/user/cart — productId 쿼리 있으면 해당 품목 삭제, 없으면 장바구니 비우기 */
 export async function DELETE(request: Request) {
-  const session = await getSession()
-  if (!session?.id || !session.isLoggedIn) {
+  const auth = await getAuthFromRequest(request)
+  if (!auth?.id) {
     return NextResponse.json({ error: '인증이 필요합니다' }, { status: 401 })
   }
-  const userId = Number(session.id)
+  const userId = auth.id
 
   const { searchParams } = new URL(request.url)
   const productIdParam = searchParams.get('productId')
@@ -203,7 +205,8 @@ export async function DELETE(request: Request) {
       },
     })
 
-    const items: CartItem[] = (updated?.items ?? []).map(item => ({
+    type CartItemEntry = NonNullable<typeof updated>["items"][number]
+    const items: CartItem[] = (updated?.items ?? []).map((item: CartItemEntry) => ({
       id: String(item.productId),
       name: item.product.name,
       price: Number(item.product.price),
@@ -224,11 +227,11 @@ export async function DELETE(request: Request) {
 
 /** PATCH /api/user/cart — 수량만 변경. body: { productId: number, quantity: number } */
 export async function PATCH(request: Request) {
-  const session = await getSession()
-  if (!session?.id || !session.isLoggedIn) {
+  const auth = await getAuthFromRequest(request)
+  if (!auth?.id) {
     return NextResponse.json({ error: '인증이 필요합니다' }, { status: 401 })
   }
-  const userId = Number(session.id)
+  const userId = auth.id
 
   let body: { productId: number; quantity: number }
   try {
@@ -280,7 +283,8 @@ export async function PATCH(request: Request) {
       },
     })
 
-    const items: CartItem[] = (updated?.items ?? []).map(item => ({
+    type CartItemEntry = NonNullable<typeof updated>["items"][number]
+    const items: CartItem[] = (updated?.items ?? []).map((item: CartItemEntry) => ({
       id: String(item.productId),
       name: item.product.name,
       price: Number(item.product.price),

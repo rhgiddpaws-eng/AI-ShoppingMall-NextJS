@@ -77,7 +77,7 @@ export default function ProductCard({
     e.preventDefault()
     e.stopPropagation()
 
-    addToCart({
+    const added = addToCart({
       id,
       name,
       price: isSale && salePrice ? salePrice : price,
@@ -85,8 +85,7 @@ export default function ProductCard({
       quantity: 1,
       category,
     })
-
-    toast.success(`${name}이(가) 장바구니에 추가되었습니다.`)
+    if (added) toast.success(`${name}이(가) 장바구니에 추가되었습니다.`)
   }
 
   const handleToggleWishlist = (e: React.MouseEvent<HTMLButtonElement>) => {
@@ -98,7 +97,7 @@ export default function ProductCard({
       setIsWishlisted(false)
       toast.success(`${name}이(가) 위시리스트에서 제거되었습니다.`)
     } else {
-      addToWishlist({
+      const added = addToWishlist({
         id,
         name,
         price,
@@ -106,8 +105,10 @@ export default function ProductCard({
         category,
         salePrice: isSale ? salePrice : undefined,
       })
-      setIsWishlisted(true)
-      toast.success(`${name}이(가) 위시리스트에 추가되었습니다.`)
+      if (added) {
+        setIsWishlisted(true)
+        toast.success(`${name}이(가) 위시리스트에 추가되었습니다.`)
+      }
     }
   }
 
@@ -173,7 +174,7 @@ export default function ProductCard({
         </div>
 
         <div className="mt-2">
-          <h3 className="font-medium text-sm line-clamp-1">{name}</h3>
+          <h3 className="font-medium text-sm line-clamp-2 min-w-0 break-words">{name}</h3>
           <p className="text-xs text-muted-foreground mb-1">{category}</p>
           <div className="flex items-center gap-2">
             {isSale && salePrice ? (

@@ -2,12 +2,17 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { BarChart3, Users, ShoppingBag, Package, MessageCircle, Settings, LogOut } from "lucide-react"
+import { BarChart3, Users, ShoppingBag, Package, MessageCircle, Settings, LogOut, Home } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 
 const sidebarItems = [
+  {
+    title: "홈으로 돌아가기",
+    href: "/",
+    icon: <Home className="h-5 w-5" />,
+  },
   {
     title: "대시보드",
     href: "/admin",

@@ -2,34 +2,10 @@
 
 /**
  * NavBar — 전역 상단 네비게이션
- *
- * [모양]
- * - 한 줄: [모바일 메뉴] 로고 | 카테고리 링크(남/여/액세서리/신발/세일) | 검색 | 테마 | 로그인/계정 | 위시리스트 | 장바구니
- * - md 미만: 카테고리 숨김, 검색은 아이콘만(/search 링크)
- * - md 이상: 검색 Input 표시, 카테고리 링크 표시
- * - 위시/장바구니에 개수 Badge (absolute -top-1 -right-1), 0이면 Badge 미표시
- * - 로고: /logo.svg, 다크모드 시 dark:invert
- *
- * [기능]
- * - 로고 클릭 → /
- * - 카테고리 → /category/men|women|accessories|shoes, 세일 → /category/sale
- * - 검색(데스크톱): Input만 있고 실검색 기능은 연동되어 있지 않음(placeholder)
- * - 검색(모바일): /search로 이동만 하며 실검색 로직 미구현
- * - 로그인 여부에 따라 /login 또는 /account, 아이콘 User/LogIn 전환
- * - 위시리스트/장바구니 개수는 useShopStore.cart, wishlist 길이
- *
- * [문법]
- * - Button asChild + Link: 링크처럼 동작하는 버튼(Next 라우팅)
- * - aria-label, title, sr-only으로 접근성
- *
- * [라이브러리 연계]
- * - next/link, next/image
- * - lucide-react: ShoppingCart, Search, User, Heart, Menu, LogIn
- * - @/components/ui: Button, Input, Badge
- * - @/components/theme-toggle: ThemeToggle
- * - @/lib/store: useShopStore(cart, wishlist), useAuthStore(user)
+ * - md 미만: 햄버거 메뉴 → Sheet로 카테고리 링크 표시 (반응형)
  */
 
+import { useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { ShoppingCart, Search, User, Heart, Menu, LogIn } from "lucide-react"
@@ -37,22 +13,58 @@ import { ShoppingCart, Search, User, Heart, Menu, LogIn } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { useShopStore } from "@/lib/store"
 import { useAuthStore } from "@/lib/store"
 
+const categoryLinks = [
+  { href: "/category/men", label: "남성" },
+  { href: "/category/women", label: "여성" },
+  { href: "/category/accessories", label: "액세서리" },
+  { href: "/category/shoes", label: "신발" },
+  { href: "/category/sale", label: "세일", className: "text-red-500" },
+]
+
 export function NavBar() {
   const { cart, wishlist } = useShopStore()
   const { user } = useAuthStore()
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   return (
     <header className="border-b">
       <div className="container mx-auto px-4 py-2 flex justify-between items-center">
         <div className="flex items-center gap-2 md:hidden">
-          <Button variant="ghost" size="icon" className="md:hidden">
-            <Menu className="h-5 w-5" />
-            <span className="sr-only">메뉴</span>
-          </Button>
+          <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+            <SheetTrigger asChild>
+              <Button variant="ghost" size="icon" aria-label="메뉴">
+                <Menu className="h-5 w-5" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="left" className="w-64">
+              <SheetHeader>
+                <SheetTitle className="sr-only">카테고리 메뉴</SheetTitle>
+              </SheetHeader>
+              <nav className="flex flex-col gap-2 pt-4">
+                {categoryLinks.map(({ href, label, className }) => (
+                  <Link
+                    key={href}
+                    href={href}
+                    className={`block py-2 font-medium hover:text-primary ${className ?? ""}`}
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    {label}
+                  </Link>
+                ))}
+              </nav>
+            </SheetContent>
+          </Sheet>
         </div>
 
         <Link href="/" className="flex items-center gap-2">

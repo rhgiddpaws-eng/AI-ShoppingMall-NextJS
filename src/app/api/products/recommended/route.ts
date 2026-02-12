@@ -1,6 +1,7 @@
 // =============================================================================
 // 추천 상품 API - GET /api/products/recommended
 // 쿼리: exclude(제외할 상품 ID) → 임베딩 기반 유사 상품 추천 목록 반환
+// DATABASE_URL(Prisma) 단일 연결 사용 — 도커에서 PG_HOST/PG_PORT 불필요
 // =============================================================================
 
 import { NextResponse } from "next/server"
@@ -8,7 +9,7 @@ import prismaClient from '@/lib/prismaClient'
 import { getCdnUrl } from '@/lib/cdn'
 import OpenAI from 'openai'
 import pgvector from 'pgvector'
-import pool from '@/lib/pgClient'
+
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 })
@@ -43,28 +44,28 @@ export async function GET(request: Request) {
     const embeddings = embedding.data[0].embedding
     const postEmb = pgvector.toSql(embeddings)
 
-    // 유사한 상품 검색 쿼리 (이미지 포함)
-    const similarProducts = await pool.query(`
+    // 유사한 상품 검색 — Prisma $queryRawUnsafe(DATABASE_URL) 사용, 도커에서 별도 PG_* 불필요
+    type SimilarRow = { id: number; name: string; price: number; category: string | null }
+    const similarRows = (await prismaClient.$queryRawUnsafe(
+      `
       WITH similar_products AS (
         SELECT 
-          p.id, 
-          p.name, 
-          p.price,
-          p.category,
-          1 - (p.vector <=> $1) as similarity
+          p.id, p.name, p.price, p.category,
+          1 - (p.vector <=> $1::vector) as similarity
         FROM "Product" p
-        WHERE p.id <> $2
+        WHERE p.id <> $2 AND p.vector IS NOT NULL
         ORDER BY similarity DESC
         LIMIT 10
       )
-      SELECT sp.id, sp.name, sp.price, sp.category 
+      SELECT sp.id, sp.name, sp.price, sp.category
       FROM similar_products sp
       ORDER BY (similarity * 0.9) + (RANDOM() * 0.1) DESC
       LIMIT 4
-    `, [postEmb, parseInt(excludeId)])
-    
-    // 이미지 정보 가져오기
-    const productIds = similarProducts.rows.map(p => p.id)
+      `,
+      postEmb,
+      parseInt(excludeId, 10)
+    )) as SimilarRow[]
+    const productIds = similarRows.map((p: SimilarRow) => p.id)
     
     const productsWithImages = await prismaClient.product.findMany({
       where: {
@@ -79,14 +80,15 @@ export async function GET(request: Request) {
     })
     
     // 최종 결과 생성
-    const result = similarProducts.rows.map(product => {
-      const productWithImage = productsWithImages.find(p => p.id === product.id)
+    const result = similarRows.map((row: SimilarRow) => {
+      type ProductWithImage = (typeof productsWithImages)[number]
+      const productWithImage = productsWithImages.find((p: ProductWithImage) => p.id === row.id)
       const imageSrc = getCdnUrl(productWithImage?.images?.[0]?.original)
       return {
-        id: product.id,
-        name: product.name,
-        price: product.price,
-        category: product.category,
+        id: row.id,
+        name: row.name,
+        price: row.price,
+        category: row.category,
         imageSrc,
       }
     })

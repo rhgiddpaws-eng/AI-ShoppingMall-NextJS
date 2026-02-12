@@ -6,23 +6,19 @@
 import { NextResponse } from 'next/server'
 import prismaClient from '@/lib/prismaClient'
 import { OrderStatus, PaymentStatus } from '@prisma/client'
-import { getSession } from '@/lib/ironSessionControl'
+import { getAuthFromRequest } from '@/lib/authFromRequest'
 import { CartItem } from '@/lib/cart'
 
 export async function POST(req: Request) {
   try {
     const { paymentKey, orderId, amount, data } = await req.json()
 
-    const session = await getSession()
-
-    const parsedSession = {
-      ...session,
-    }
-
-    if (!parsedSession.id) {
-      return NextResponse.json({
-        message: '로그인이 필요합니다.',
-      })
+    const auth = await getAuthFromRequest(req)
+    if (!auth?.id) {
+      return NextResponse.json(
+        { message: '로그인이 필요합니다.' },
+        { status: 401 }
+      )
     }
 
     console.log('paymentKey:', paymentKey)
@@ -36,7 +32,7 @@ export async function POST(req: Request) {
     console.log('parsedData:', parsedData)
 
     const secretKey = 'test_gsk_docs_OaPz8L5KdmQXkzRz3y47BMw6'
-    
+
     // Base64로 인코딩된 인증 키 생성
     const encryptedSecretKey = 'Basic ' + Buffer.from(secretKey + ':').toString('base64')
 
@@ -55,7 +51,7 @@ export async function POST(req: Request) {
           }),
         }
       )
-      
+
       const data = await response.json()
       console.log('결제 취소 응답:', data)
       return data
@@ -96,7 +92,7 @@ export async function POST(req: Request) {
           data: {
             totalAmount: +amount,
             status: OrderStatus.PENDING,
-            userId: parsedSession.id!,
+            userId: auth.id,
             items: {
               create: parsedData.cart.map((item: CartItem) => ({
                 productId: +item.id,
@@ -115,7 +111,7 @@ export async function POST(req: Request) {
             },
           },
         })
-        
+
         return order;
       } catch (error) {
         // 데이터베이스 처리 중 오류 발생 시 결제 취소
@@ -132,7 +128,7 @@ export async function POST(req: Request) {
     })
   } catch (error) {
     console.error('결제 처리 중 오류 발생:', error);
-    
+
     // 이미 결제가 승인되었다면 취소 시도
     if (error instanceof Error) {
       try {
@@ -140,7 +136,7 @@ export async function POST(req: Request) {
         if (paymentKey) {
           const secretKey = 'test_gsk_docs_OaPz8L5KdmQXkzRz3y47BMw6';
           const encryptedSecretKey = 'Basic ' + Buffer.from(secretKey + ':').toString('base64');
-          
+
           const response = await fetch(
             `https://api.tosspayments.com/v1/payments/${paymentKey}/cancel`,
             {
@@ -154,14 +150,14 @@ export async function POST(req: Request) {
               }),
             }
           );
-          
+
           console.log('결제 취소 시도:', await response.json());
         }
       } catch (cancelError) {
         console.error('결제 취소 중 오류:', cancelError);
       }
     }
-    
+
     return NextResponse.json({
       message: '결제 처리 중 오류가 발생했습니다',
       error: error instanceof Error ? error.message : '알 수 없는 오류',

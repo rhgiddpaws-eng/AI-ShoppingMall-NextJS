@@ -6,9 +6,9 @@ import { NextResponse } from 'next/server'
 import prismaClient from '@/lib/prismaClient'
 import { requireAdminSession } from '@/lib/requireAdminSession'
 
-export async function GET() {
-  const auth = await requireAdminSession()
-  if (auth.error) return auth.error
+export async function GET(request: Request) {
+  const auth = await requireAdminSession(request)
+  if ('error' in auth) return auth.error
 
   try {
     const list = await prismaClient.inquiry.findMany({

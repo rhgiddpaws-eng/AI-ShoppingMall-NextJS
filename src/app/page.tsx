@@ -8,55 +8,29 @@ import Image from 'next/image'
 
 import { Button } from '@/components/ui/button'
 import { FeaturedProducts } from '@/components/featured-products'
+import { HeroSection } from '@/components/hero-section'
 import { NavBar } from '@/components/NavBar'
 import { NewProducts } from '@/components/new-products'
 
 /**
- * 홈 페이지 컴포넌트
- * - 전체를 min-h-screen 플렉스 컬럼으로 구성 (헤더·메인·푸터)
+ * 홈 페이지: 히어로(GIF/동영상/이미지 + 애니메이션), 카테고리, 인기/신상품
+ * - GIF: NEXT_PUBLIC_HERO_GIF_URL 또는 HeroSection gifSrc
+ * - 동영상: NEXT_PUBLIC_HERO_VIDEO_URL 또는 videoSrc (GIF 없을 때)
  */
 export default function Home() {
+  const heroGifSrc = typeof process.env.NEXT_PUBLIC_HERO_GIF_URL === "string"
+    ? process.env.NEXT_PUBLIC_HERO_GIF_URL
+    : undefined
+  const heroVideoSrc = typeof process.env.NEXT_PUBLIC_HERO_VIDEO_URL === "string"
+    ? process.env.NEXT_PUBLIC_HERO_VIDEO_URL
+    : undefined
+
   return (
     <div className="flex flex-col min-h-screen">
-      {/* 상단 네비게이션 (로고, 메뉴, 장바구니 등) */}
       <NavBar />
 
       <main className="flex-1">
-        {/* Hero Banner: 메인 비주얼 + CTA 버튼 (신상품/세일) */}
-        <section className="relative">
-            <div className="relative h-[300px] sm:h-[400px] md:h-[500px] lg:h-[600px] w-full">
-            <Image
-              src="/main/1.webp"
-              alt="Summer Collection"
-              fill
-              sizes="100vw"
-              className="object-cover"
-              priority
-            />
-            {/* 히어로 오버레이: 제목, 부제, CTA 버튼 */}
-            <div className="absolute inset-0 bg-black/30 flex flex-col items-center justify-center text-white p-4">
-              <h1 className="text-3xl md:text-5xl font-bold text-center mb-4">
-                여름 컬렉션 출시
-              </h1>
-              <p className="text-lg md:text-xl text-center mb-6">
-                최신 트렌드로 여름을 준비하세요
-              </p>
-              <div className="flex gap-4">
-                <Button size="lg" asChild>
-                  <Link href="/category/new">신상품 보기</Link>
-                </Button>
-                <Button
-                  size="lg"
-                  variant="outline"
-                  className="bg-white/10 backdrop-blur-sm border-white text-white hover:bg-white/20"
-                  asChild
-                >
-                  <Link href="/category/sale">세일 상품</Link>
-                </Button>
-              </div>
-            </div>
-          </div>
-        </section>
+        <HeroSection gifSrc={heroGifSrc} videoSrc={heroVideoSrc} />
 
         {/* Categories: 남성/여성/액세서리/신발 카테고리 그리드 링크 */}
         <section className="py-12 container mx-auto px-4">

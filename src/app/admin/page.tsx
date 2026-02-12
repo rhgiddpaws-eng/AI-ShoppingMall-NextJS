@@ -6,9 +6,8 @@
 
 import { useState, useEffect } from "react"
 import { Users, CreditCard, Package, ShoppingCart } from "lucide-react"
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
-
 import { DashboardCard } from "@/components/admin/dashboard-card"
+import { SalesChartUplot } from "@/components/admin/sales-chart-uplot"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
@@ -109,22 +108,8 @@ export default function AdminDashboard() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={dashboardData.salesData}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis dataKey="name" className="text-xs" />
-                  <YAxis
-                    tickFormatter={(value) =>
-                      value >= 10000 ? `${(value / 10000).toFixed(0)}만` : value.toLocaleString()
-                    }
-                    className="text-xs"
-                    width={48}
-                  />
-                  <Tooltip formatter={(value) => [`${Number(value).toLocaleString()}원`, "매출"]} />
-                  <Bar dataKey="매출" fill="hsl(217 91% 60%)" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+            <div className="h-[300px] w-full">
+              <SalesChartUplot data={dashboardData.salesData} height={300} />
             </div>
           </CardContent>
         </Card>

@@ -9,7 +9,7 @@ import { requireAdminSession } from "@/lib/requireAdminSession"
 import OpenAI from "openai"
 import pool from "@/lib/pgClient"
 import pgvector from "pgvector"
-import { Category } from "@prisma/client"
+import { Category, ProductStatus } from "@prisma/client"
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -46,7 +46,7 @@ async function updateProductVector(productId: number, embeddings: number[]) {
     }
 
     const postEmbedding = pgvector.toSql(embeddings);
-    
+
     // 2. UPDATE 쿼리 수정 및 더 자세한 로깅
     const queryText = `
       UPDATE "Product"
@@ -62,12 +62,12 @@ async function updateProductVector(productId: number, embeddings: number[]) {
     `;
 
     const values = [postEmbedding, productId];
-    
+
     console.log("실행할 쿼리:", queryText);
     console.log("쿼리 파라미터:", values);
-    
+
     const result = await pool.query(queryText, values);
-    
+
     console.log("UPDATE 쿼리 결과:", result);
     console.log("영향받은 행 수:", result.rowCount);
     console.log("반환된 데이터:", result.rows[0]);
@@ -86,7 +86,7 @@ async function updateProductVector(productId: number, embeddings: number[]) {
     return (result?.rowCount ?? 0) > 0;
   } catch (error) {
     console.error("벡터 업데이트 중 상세 오류:", error);
-    
+
     // 4. 데이터베이스 연결 상태 및 pgvector 확장 확인
     try {
       const diagnostics = await pool.query(`
@@ -101,7 +101,7 @@ async function updateProductVector(productId: number, embeddings: number[]) {
     } catch (dbError) {
       console.error("DB 진단 실패:", dbError);
     }
-    
+
     return false;
   }
 }
@@ -120,7 +120,7 @@ export interface CreateProductResponse {
 }
 
 export async function GET(request: Request) {
-  const auth = await requireAdminSession()
+  const auth = await requireAdminSession(request)
   if ("error" in auth) return auth.error
   const { searchParams } = new URL(request.url)
   const search = searchParams.get("search")?.toLowerCase()
@@ -139,11 +139,12 @@ export async function GET(request: Request) {
   }
 
   const list = await prismaClient.product.findMany({
-    where: where as { name?: { contains: string; mode: "insensitive" }; category?: Category; status?: string },
+    where: where as { name?: { contains: string; mode: "insensitive" }; category?: Category; status?: ProductStatus },
     orderBy: { id: "desc" },
   })
 
-  const mapped = list.map((p) => {
+  type ProductRow = (typeof list)[number]
+  const mapped = list.map((p: ProductRow) => {
     const row = p as { status?: string }
     return {
       id: String(p.id),
@@ -159,17 +160,17 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const auth = await requireAdminSession()
+  const auth = await requireAdminSession(request)
   if ("error" in auth) return auth.error
   try {
     const productData = await request.json()
-    
+
     // 임베딩 먼저 생성 (트랜잭션 외부)
     let embeddings = null
     if (productData.description) {
       embeddings = await generateEmbedding(productData.description)
     }
-    
+
     // 트랜잭션 시작
     const status = productData.isDraft === true ? "DRAFT" : "PUBLISHED"
 
@@ -183,9 +184,9 @@ export async function POST(request: Request) {
           discountRate: productData.discountRate || 0,
           category: productData.category || null,
           status,
-        } as Parameters<typeof tx.product.create>[0]["data"],
+        },
       })
-      
+
       // 2. 벡터 업데이트를 트랜잭션 내에서 raw query로 실행
       if (embeddings) {
         const postEmbedding = pgvector.toSql(embeddings)
@@ -195,13 +196,13 @@ export async function POST(request: Request) {
           WHERE "id" = ${product.id}
         `
       }
-      
+
       // 3. 업데이트된 상품 정보 반환
       return await tx.product.findUnique({
         where: { id: product.id },
       })
     })
-    
+
     // 응답 반환
     return NextResponse.json(result, { status: 201 })
   } catch (error) {

@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "pnpm exec next build",
     "start": "next start",
     "lint": "next lint",
     "pathgen": "npx pathgen --dir ./src/app --output ./src/lib/apiRoutes.ts",
@@ -72,6 +72,7 @@
     "framer-motion": "^12.4.12",
     "input-otp": "^1.4.2",
     "iron-session": "^8.0.4",
+    "jose": "^5.9.6",
     "lodash": "^4.17.21",
     "lucide-react": "^0.479.0",
     "mime-types": "^2.1.35",
@@ -89,9 +90,10 @@
     "react-dom": "^19.0.0",
     "react-hook-form": "^7.54.2",
     "react-intersection-observer": "^9.16.0",
-    "react-lottie": "^1.2.10",
+    "lottie-react": "^2.4.0",
     "react-resizable-panels": "^2.1.7",
     "recharts": "^2.15.1",
+    "uplot": "^1.6.32",
     "sharp": "^0.33.5",
     "sonner": "^2.0.1",
     "tailwind-merge": "^3.0.2",
@@ -112,11 +114,13 @@
     "@types/pg": "^8.11.11",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@types/react-lottie": "^1.2.10",
     "pathgen": "^2.0.0",
-    "prisma": "^6.4.1",
+    "prisma": "6.4.1",
     "tailwindcss": "^4",
     "tsx": "^4.19.3",
     "typescript": "^5.8.2"
+  },
+  "optionalDependencies": {
+    "lightningcss-win32-x64-msvc": "1.30.2"
   }
 }

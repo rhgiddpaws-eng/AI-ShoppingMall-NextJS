@@ -5,15 +5,15 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import prismaClient from '@/lib/prismaClient'
-import { getSession } from '@/lib/ironSessionControl'
+import { getAuthFromRequest } from '@/lib/authFromRequest'
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const session = await getSession()
-    if (!session?.id || !session.isLoggedIn) {
+    const auth = await getAuthFromRequest(request)
+    if (!auth?.id) {
       return NextResponse.json({ error: '인증이 필요합니다' }, { status: 401 })
     }
 
@@ -23,7 +23,7 @@ export async function GET(
     }
 
     const inquiry = await prismaClient.inquiry.findFirst({
-      where: { id, userId: session.id },
+      where: { id, userId: auth.id },
       select: {
         id: true,
         orderId: true,

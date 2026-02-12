@@ -1,15 +1,16 @@
 'use client'
 // =============================================================================
 // 로그인 페이지 - /login
-// 이메일/비밀번호 로그인 폼, 소셜 로그인(Google/GitHub) 버튼, 회원가입 링크
+// 이메일/비밀번호 로그인 폼, 소셜 로그인(Google/Kakao) 링크, 회원가입 링크
 // =============================================================================
 
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
+import { useEffect } from 'react'
 import * as z from 'zod'
-import { ArrowLeft, Loader2, Github, ChromeIcon as Google } from 'lucide-react'
+import { ArrowLeft, Loader2, ChromeIcon as Google, MessageCircle } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -25,10 +26,11 @@ const loginSchema = z.object({
 
 type LoginForm = z.infer<typeof loginSchema>
 
-/** 로그인: 폼 검증 후 useAuthStore.login 호출, 성공 시 /account로 이동 */
+/** 로그인: 폼 검증 후 useAuthStore.login 호출, 성공 시 /account로 이동. OAuth 성공 시 setAuthFromSession 후 리다이렉트 */
 export default function LoginPage() {
   const router = useRouter()
-  const { login, isLoading } = useAuthStore()
+  const searchParams = useSearchParams()
+  const { login, setAuthFromSession, isLoading } = useAuthStore()
   const {
     register,
     handleSubmit,
@@ -36,6 +38,41 @@ export default function LoginPage() {
   } = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
   })
+
+  useEffect(() => {
+    const oauthSuccess = searchParams.get('oauth') === 'success'
+    const oauthError = searchParams.get('error')
+    if (oauthError) {
+      const msg =
+        oauthError === 'no_code'
+          ? '로그인 권한이 없습니다.'
+          : oauthError === 'config'
+            ? 'OAuth 설정이 없습니다.'
+            : oauthError === 'no_email'
+              ? '이메일 정보를 가져올 수 없습니다.'
+              : '소셜 로그인에 실패했습니다.'
+      toast.error(msg)
+      router.replace('/login', { scroll: false })
+      return
+    }
+    if (!oauthSuccess) return
+    let mounted = true
+    setAuthFromSession().then((ok) => {
+      if (!mounted) return
+      if (ok) {
+        const { user } = useAuthStore.getState()
+        toast.success('로그인 성공')
+        router.refresh()
+        router.replace(user?.role === 'ADMIN' ? '/admin' : '/account', { scroll: false })
+      } else {
+        toast.error('세션을 불러오지 못했습니다.')
+        router.replace('/login', { scroll: false })
+      }
+    })
+    return () => {
+      mounted = false
+    }
+  }, [searchParams, router, setAuthFromSession])
 
   const onSubmit = async (data: LoginForm) => {
     const success = await login(data.email, data.password)
@@ -50,12 +87,6 @@ export default function LoginPage() {
     } else {
       toast.error('로그인 실패')
     }
-  }
-
-  const handleSocialLogin = (provider: string) => {
-    // 소셜 로그인 로직 구현
-    toast.info(`${provider} 로그인`)
-    toast.error('소셜 로그인 기능은 아직 구현되지 않았습니다.')
   }
 
   return (
@@ -111,21 +142,17 @@ export default function LoginPage() {
       <Separator className="my-8" />
 
       <div className="space-y-4">
-        <Button
-          variant="outline"
-          className="w-full"
-          onClick={() => handleSocialLogin('Google')}
-        >
-          <Google className="mr-2 h-4 w-4" />
-          Google로 로그인
+        <Button variant="outline" className="w-full" asChild>
+          <Link href="/api/auth/google">
+            <Google className="mr-2 h-4 w-4" />
+            Google로 로그인
+          </Link>
         </Button>
-        <Button
-          variant="outline"
-          className="w-full"
-          onClick={() => handleSocialLogin('GitHub')}
-        >
-          <Github className="mr-2 h-4 w-4" />
-          GitHub로 로그인
+        <Button variant="outline" className="w-full" asChild>
+          <Link href="/api/auth/kakao">
+            <MessageCircle className="mr-2 h-4 w-4" />
+            카카오로 로그인
+          </Link>
         </Button>
       </div>
 

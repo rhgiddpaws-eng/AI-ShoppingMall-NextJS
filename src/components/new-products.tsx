@@ -28,6 +28,7 @@ import { useEffect, useState } from 'react'
 import ProductCard from '@/components/product-card'
 import { ProductWithImages } from '@/app/api/products/route'
 import { getCdnUrl } from '@/lib/cdn'
+import { safeParseJson } from '@/lib/utils'
 
 export function NewProducts() {
   const [products, setProducts] = useState<ProductWithImages[]>([])
@@ -36,8 +37,9 @@ export function NewProducts() {
     const fetchProducts = async () => {
       try {
         const response = await fetch('/api/products?limit=8')
-        const data = await response.json()
-        setProducts(data)
+        const data = await safeParseJson<ProductWithImages[]>(response)
+        if (Array.isArray(data)) setProducts(data)
+        else if (!response.ok) console.error('상품을 불러오는데 실패했습니다:', response.status)
       } catch (error) {
         console.error('상품을 불러오는데 실패했습니다:', error)
       }
@@ -48,7 +50,7 @@ export function NewProducts() {
 
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
-      {products.map(product => (
+      {(products ?? []).map(product => (
         <ProductCard
           key={product.id}
           id={product.id.toString()}

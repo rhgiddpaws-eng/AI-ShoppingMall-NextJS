@@ -24,15 +24,26 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({
 }) => {
   const [queryClient] = useState(() => new QueryClient())
   const user = useAuthStore(state => state.user)
+  const isHydrated = useAuthStore(state => state.isHydrated)
   const fetchCart = useShopStore(state => state.fetchCart)
   const fetchWishlist = useShopStore(state => state.fetchWishlist)
+  const setCart = useShopStore(state => state.setCart)
+  const setWishlist = useShopStore(state => state.setWishlist)
+
+  //isHydrated === true이고 user === null
+  //복구는 끝났고 유저가 없다는 뜻이니까, 
+  //진짜 비로그인으로 보고 장바구니/위시리스트를 비우면 됨.
 
   useEffect(() => {
     if (user) {
       fetchCart()
       fetchWishlist()
+    } else if (isHydrated) {
+      /** 비로그인 상태가 확정되면 장바구니·위시리스트 비움(persist된 데이터 노출 방지) */
+      setCart([])
+      setWishlist([])
     }
-  }, [user, fetchCart, fetchWishlist])
+  }, [user, isHydrated, fetchCart, fetchWishlist, setCart, setWishlist])
 
   return (
     <QueryClientProvider client={queryClient}>

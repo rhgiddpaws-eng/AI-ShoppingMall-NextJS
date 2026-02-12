@@ -17,6 +17,10 @@
 - 반응형 UI, **다크모드 지원**, 그리고 **매끄럽고 인터랙티브한 사용자 경험**을 
 제공하는 고수준의 UI/UX를 목표로 합니다.
 
+### 개발 워크플로우 (도커 이슈 시)
+- 변경사항 커밋 후 **push**하고, 도커 컨테이너는 중지한 뒤 **로컬에서 `pnpm dev`**로 개발·검증하는 것을 권장합니다.
+- 도커 이슈 재현이 필요할 때만 `docker-compose`로 띄워 확인합니다. 진행 상황은 [DOCUMENT/tasks.md](DOCUMENT/tasks.md)에서 체크리스트로 관리합니다.
+
 ---
 
 # 2. 주요 기능
@@ -322,5 +326,38 @@
 
 
 
-## 6.1 벡터값 넣기
-- prisma client 가 제공하는 로우쿼리를 이용해야 백터값을 db에 업데이트 할수 있음
+## 6.1 기타 중요사항
+
+- **벡터값 넣기**
+  - prisma client 가 제공하는 로우쿼리를 이용해야 백터값을 db에 업데이트 할수 있음
+- **포트포워딩**
+  - 내 원룸 공인 IP 는 112.214.35.103 임
+  - 공유기에서  http://192.168.200.254:10010 원룸
+  - admin, admin015C (015C 는 뒷면 맥주소 마지막 4개)
+
+  - 규칙 이름	아무 이름 (예: nginx 또는 웹80)
+  - 내부 IP 주소(서버 PC)	192.168.200.121 (nginx 돌리는 이 PC의 IP)
+  - 프로토콜	TCP (또는 ALL)
+  - 포트번호(외부)	왼쪽 칸 80, 오른쪽 칸 80
+  - 포트번호(내부)	왼쪽 칸 80, 오른쪽 칸 80
+
+  - 서로 다른 호스트 이름이라 ncott.shop만 바꿔도 됩니다.
+  -  ncott.shop → A 레코드만 당신 공인 IP로 수정 (또는 기존 CNAME 제거 후 A 추가)
+  - cdn.ncott.shop → 지금처럼 AWS(S3/CloudFront 등)로 두기
+  - 그러면:
+  - https://ncott.shop → 당신 서버(nginx)
+  -  https://cdn.ncott.shop (또는 프로젝트에서 쓰는 CDN URL) → S3/CDN 그대로 동작
+   
+  
+  지금 ncott.shop이 AWS 쪽으로 가게 하려고 CNAME으로 되어 있을 수 있어요.
+예: ncott.shop → CNAME → d1234abcd.cloudfront.net (CloudFront)
+이렇게 되어 있으면, 누가 ncott.shop으로 접속하면 DNS가 “실제로는 저 CloudFront 주소로 가라”고만 알려주고, 최종적으로는 AWS(CloudFront) IP로 연결됩니다.
+그래서:
+CNAME 제거 = ncott.shop이 더 이상 “다른 도메인(CloudFront 등)”을 가리키지 않게 지우는 것.
+A 추가 = ncott.shop을 “이 IP(공유기 공인 IP)로 가라”고 새로 적어 넣는 것.
+한 마디로:
+CNAME: “ncott.shop = 저 도메인(AWS 주소)랑 같아”
+A: “ncott.shop = 이 IP(공유기 공인 IP)로 가”
+그래서 ncott.shop을 공유기로 보내려면
+“CNAME 있으면 그거 빼고, 대신 A 레코드로 공인 IP 넣어라”는 뜻으로 말한 거예요.
+cdn.ncott.shop은 CNAME 그대로 두고, ncott.shop만 CNAME 제거 후 A로 바꾸면 됩니다.

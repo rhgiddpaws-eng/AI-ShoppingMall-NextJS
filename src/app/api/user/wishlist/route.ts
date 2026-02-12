@@ -6,7 +6,7 @@
  */
 import { NextResponse } from 'next/server'
 import prismaClient from '@/lib/prismaClient'
-import { getSession } from '@/lib/ironSessionControl'
+import { getAuthFromRequest } from '@/lib/authFromRequest'
 import type { WishlistItem } from '@/lib/wishlist'
 import { getCdnUrl } from '@/lib/cdn'
 
@@ -27,12 +27,12 @@ interface WishlistEntryWithProduct {
 }
 
 /** GET /api/user/wishlist — 로그인 사용자 위시리스트 조회. 없으면 생성 후 빈 배열 반환 */
-export async function GET() {
-  const session = await getSession()
-  if (!session?.id || !session.isLoggedIn) {
+export async function GET(request: Request) {
+  const auth = await getAuthFromRequest(request)
+  if (!auth?.id) {
     return NextResponse.json({ error: '인증이 필요합니다' }, { status: 401 })
   }
-  const userId = Number(session.id)
+  const userId = auth.id
 
   try {
     let wishlist = await prisma.wishlist.findUnique({
@@ -105,11 +105,11 @@ export async function GET() {
 
 /** POST /api/user/wishlist — 위시리스트에 추가. body: { productId: number } */
 export async function POST(request: Request) {
-  const session = await getSession()
-  if (!session?.id || !session.isLoggedIn) {
+  const auth = await getAuthFromRequest(request)
+  if (!auth?.id) {
     return NextResponse.json({ error: '인증이 필요합니다' }, { status: 401 })
   }
-  const userId = Number(session.id)
+  const userId = auth.id
 
   let body: { productId: number }
   try {
@@ -184,11 +184,11 @@ export async function POST(request: Request) {
 
 /** DELETE /api/user/wishlist?productId=1 — 해당 품목 제거. productId 없으면 전체 비우기 */
 export async function DELETE(request: Request) {
-  const session = await getSession()
-  if (!session?.id || !session.isLoggedIn) {
+  const auth = await getAuthFromRequest(request)
+  if (!auth?.id) {
     return NextResponse.json({ error: '인증이 필요합니다' }, { status: 401 })
   }
-  const userId = Number(session.id)
+  const userId = auth.id
 
   const { searchParams } = new URL(request.url)
   const productIdParam = searchParams.get('productId')

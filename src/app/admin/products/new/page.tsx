@@ -16,7 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { toast } from "sonner"
-import { Category } from "@prisma/client"
+import { Category } from "@/lib/orderEnums"
 import { CreateProductResponse } from "@/app/api/admin/products/route"
 
 interface ProductForm {

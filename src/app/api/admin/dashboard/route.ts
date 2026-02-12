@@ -81,7 +81,7 @@ function getDashboardData(period: "week" | "month" | "year") {
 }
 
 export async function GET(request: Request) {
-  const auth = await requireAdminSession()
+  const auth = await requireAdminSession(request)
   if ("error" in auth) return auth.error
 
   const { searchParams } = new URL(request.url)

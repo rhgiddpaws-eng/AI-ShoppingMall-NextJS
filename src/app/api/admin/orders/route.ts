@@ -74,30 +74,31 @@ const orders = [
 ]
 
 export async function GET(request: Request) {
-  const auth = await requireAdminSession()
+  const auth = await requireAdminSession(request)
   if ("error" in auth) return auth.error
   const { searchParams } = new URL(request.url)
   const search = searchParams.get("search")?.toLowerCase()
   const status = searchParams.get("status")
 
   // 검색어와 상태로 필터링
+  type OrderRow = (typeof orders)[number]
   let filteredOrders = orders
 
   if (search) {
     filteredOrders = filteredOrders.filter(
-      (order) => order.id.toLowerCase().includes(search) || order.customer.toLowerCase().includes(search),
+      (order: OrderRow) => order.id.toLowerCase().includes(search) || order.customer.toLowerCase().includes(search),
     )
   }
 
   if (status && status !== "all") {
-    filteredOrders = filteredOrders.filter((order) => order.deliveryStatus === status)
+    filteredOrders = filteredOrders.filter((order: OrderRow) => order.deliveryStatus === status)
   }
 
   return NextResponse.json(filteredOrders)
 }
 
 export async function PUT(request: Request) {
-  const auth = await requireAdminSession()
+  const auth = await requireAdminSession(request)
   if ("error" in auth) return auth.error
   try {
     const { orderId, deliveryStatus } = await request.json()

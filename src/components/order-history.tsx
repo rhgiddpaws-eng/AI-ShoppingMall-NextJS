@@ -55,7 +55,8 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useIntersection } from '@/hooks/use-intersection'
 import { getCdnUrl } from '@/lib/cdn'
-import { OrderStatus, PaymentStatus } from '@prisma/client'
+import { getDeliveryStatusLabel } from '@/lib/deliveryStatus'
+import { OrderStatus, PaymentStatus } from '@/lib/orderEnums'
 import {
   OrdersResponse,
   OrdersQueryParams,
@@ -286,7 +287,7 @@ export function OrderHistory() {
         </div>
 
         <div className="mb-6">
-          <div className="flex justify-between items-center mb-4">
+          <div className="flex flex-wrap items-center gap-2 mb-4">
             <div>
               <h4 className="font-medium">주문번호: #{selectedOrder.id}</h4>
               <p className="text-sm text-muted-foreground">
@@ -294,6 +295,11 @@ export function OrderHistory() {
               </p>
             </div>
             {getStatusBadge(selectedOrder.status)}
+            {'deliveryStatus' in selectedOrder && selectedOrder.deliveryStatus && (
+              <Badge variant="secondary" className="shrink-0">
+                배달: {getDeliveryStatusLabel(selectedOrder.deliveryStatus)}
+              </Badge>
+            )}
           </div>
 
           <Card>
@@ -364,6 +370,12 @@ export function OrderHistory() {
             <Card>
               <CardContent className="p-4">
                 <h4 className="font-medium mb-4">주문 요약</h4>
+                {'shippingAddress' in selectedOrder && selectedOrder.shippingAddress && (
+                  <div className="mb-3 text-sm">
+                    <span className="text-muted-foreground">배송지 </span>
+                    <span className="break-words">{selectedOrder.shippingAddress}</span>
+                  </div>
+                )}
                 <div className="space-y-2">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">상품 금액</span>

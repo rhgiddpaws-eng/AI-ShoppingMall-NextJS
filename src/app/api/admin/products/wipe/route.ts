@@ -3,7 +3,7 @@
 // DB의 모든 상품·이미지 삭제 및 S3 객체 삭제. 주문에 포함된 상품이 있으면 실패.
 // =============================================================================
 
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import prismaClient from "@/lib/prismaClient"
 import { requireAdminSession } from "@/lib/requireAdminSession"
 import { S3Client, DeleteObjectCommand } from "@aws-sdk/client-s3"
@@ -18,14 +18,15 @@ const s3Client = new S3Client({
 
 const BUCKET = process.env.AWS_BUCKET_NAME!
 
-export async function POST() {
-  const auth = await requireAdminSession()
+export async function POST(request: NextRequest) {
+  const auth = await requireAdminSession(request)
   if ("error" in auth) return auth.error
 
   try {
+    type ProductIdRow = { id: number }
     const productIds = await prismaClient.product.findMany({
       select: { id: true },
-    }).then((rows) => rows.map((r) => r.id))
+    }).then((rows: ProductIdRow[]) => rows.map((r: ProductIdRow) => r.id))
 
     if (productIds.length === 0) {
       return NextResponse.json({ ok: true, deleted: 0, message: "삭제할 상품이 없습니다." })
@@ -37,10 +38,11 @@ export async function POST() {
       distinct: ["productId"],
     })
     if (withOrders.length > 0) {
+      type OrderItemRow = (typeof withOrders)[number]
       return NextResponse.json(
         {
           error: "주문에 포함된 상품이 있어 전체 삭제할 수 없습니다. 주문이 없는 상태에서만 가능합니다.",
-          productIds: withOrders.map((o) => o.productId),
+          productIds: withOrders.map((o: OrderItemRow) => o.productId),
         },
         { status: 400 }
       )
@@ -58,7 +60,7 @@ export async function POST() {
 
     if (BUCKET && cdnKeys.length > 0) {
       await Promise.all(
-        cdnKeys.map((key) =>
+        cdnKeys.map((key: string) =>
           s3Client.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key }))
         )
       )

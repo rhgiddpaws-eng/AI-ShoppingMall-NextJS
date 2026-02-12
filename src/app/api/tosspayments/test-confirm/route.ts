@@ -6,20 +6,21 @@
 import { NextResponse } from 'next/server'
 import prismaClient from '@/lib/prismaClient'
 import { OrderStatus, PaymentStatus } from '@prisma/client'
-import { getSession } from '@/lib/ironSessionControl'
+import { getAuthFromRequest } from '@/lib/authFromRequest'
 import { CartItem } from '@/lib/cart'
 
 export async function POST(req: Request) {
   try {
     const { amount, data } = await req.json()
 
-    const session = await getSession()
-    if (!session?.id) {
+    const auth = await getAuthFromRequest(req)
+    if (!auth?.id) {
       return NextResponse.json(
         { message: '로그인이 필요합니다.' },
         { status: 401 }
       )
     }
+    const userId = auth.id
 
     const parsedData = typeof data === 'string' ? JSON.parse(data) : data
     const totalAmount = Number(amount) || 0
@@ -37,7 +38,7 @@ export async function POST(req: Request) {
         data: {
           totalAmount,
           status: OrderStatus.PAID,
-          userId: session.id,
+          userId,
           items: {
             create: parsedData.cart.map((item: CartItem) => ({
               productId: +item.id,

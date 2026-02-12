@@ -52,7 +52,7 @@ export default function WishlistItem({ item }: WishlistItemProps) {
   }
 
   const handleAddToCart = () => {
-    addToCart({
+    const added = addToCart({
       id: item.id,
       name: item.name,
       price: item.salePrice || item.price,
@@ -60,8 +60,7 @@ export default function WishlistItem({ item }: WishlistItemProps) {
       category: item.category,
       quantity: 1,
     })
-
-    toast.success(`${item.name}이(가) 장바구니에 추가되었습니다.`)
+    if (added) toast.success(`${item.name}이(가) 장바구니에 추가되었습니다.`)
   }
 
   return (

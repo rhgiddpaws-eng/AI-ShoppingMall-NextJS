@@ -6,7 +6,7 @@
 import { NextResponse } from 'next/server'
 import prismaClient from '@/lib/prismaClient'
 import { OrderStatus, PaymentStatus, Order } from '@prisma/client'
-import { getSession } from '@/lib/ironSessionControl'
+import { getAuthFromRequest } from '@/lib/authFromRequest'
 import { getCdnUrl } from '@/lib/cdn'
 
 // 주문 항목의 타입 정의
@@ -61,25 +61,16 @@ export interface OrderDetailsParams {
 }
 
 export async function GET(request: Request) {
-  // 인증된 사용자 세션 가져오기
-  const preSession = await getSession()
-
-  const session = {
-    ...preSession,
-  }
-
-  if (!session || !session.id || !session.isLoggedIn) {
+  const auth = await getAuthFromRequest(request)
+  if (!auth?.id) {
     return NextResponse.json({ error: '인증이 필요합니다' }, { status: 401 })
   }
+  const userId = auth.id
 
-  // URL에서 쿼리 파라미터 추출
   const { searchParams } = new URL(request.url)
   const status = searchParams.get('status') as OrderStatus | null
   const cursor = searchParams.get('cursor')
   const limit = Number(searchParams.get('limit') || '5')
-
-  // 사용자 ID 가져오기
-  const userId = Number(session.id)
 
   // 필터 조건 구성
   const where = {
@@ -125,9 +116,11 @@ export async function GET(request: Request) {
       orders.length === limit ? orders[orders.length - 1].id : null
 
     // 응답 데이터 가공
-    const formattedOrders = orders.map(order => ({
+    type OrderRow = (typeof orders)[number]
+    type OrderItemRow = OrderRow["items"][number]
+    const formattedOrders = orders.map((order: OrderRow) => ({
       ...order,
-      items: order.items.map(item => ({
+      items: order.items.map((item: OrderItemRow) => ({
         ...item,
         product: {
           ...item.product,

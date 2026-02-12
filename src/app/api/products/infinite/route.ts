@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
     ...(term && {
       name: {
         contains: term,
-        mode: 'insensitive',
+        mode: 'insensitive' as const,
       },
     }),
   }
@@ -72,7 +72,8 @@ export async function GET(request: NextRequest) {
     // }))
 
     // 이미지 순서 고정 (id 오름차순) → 프론트 images[0]이 항상 동일
-    const productsWithOrderedImages = products.map(p => ({
+    type ProductRow = (typeof products)[number]
+    const productsWithOrderedImages = products.map((p: ProductRow) => ({
       ...p,
       images: [...p.images].sort((a, b) => a.id - b.id),
     }))

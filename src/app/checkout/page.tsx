@@ -2,11 +2,12 @@
 // =============================================================================
 // 결제 페이지 - /checkout
 // 주문 상품 요약, 배송 정보 폼, 결제 수단 선택, 토스페이먼츠 위젯 연동
+// 로그인 필수: 비로그인 시 /login으로 리다이렉트
 // =============================================================================
 
 import type React from 'react'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, CreditCard } from 'lucide-react'
 
@@ -19,13 +20,22 @@ import { Separator } from '@/components/ui/separator'
 import { toast } from 'sonner'
 import TossPayments from './components/TossPayments'
 
-/** 결제: 장바구니 비면 안내, 아니면 주문 요약 + 배송 정보 + TossPayments 위젯 */
+/** 결제: 장바구니 비면 안내, 로그인 필수, 아니면 주문 요약 + 배송 정보 + TossPayments 위젯 */
 export default function CheckoutPage() {
   const router = useRouter()
   const { cart, clearCart } = useShopStore()
   const [isLoading, setIsLoading] = useState(false)
   const [address, setAddress] = useState('')
   const { user } = useAuthStore()
+
+  // 로그인 필수: 비로그인 시 로그인 페이지로 (결제 후 돌아올 수 있도록 returnUrl 전달)
+  useEffect(() => {
+    if (user === undefined) return // 아직 초기화 전
+    if (!user) {
+      toast.error('결제하려면 로그인이 필요합니다.')
+      router.replace(`/login?returnUrl=${encodeURIComponent('/checkout')}`)
+    }
+  }, [user, router])
 
   const totalAmount = cart.reduce(
     (total, item) => total + item.price * item.quantity,
@@ -54,6 +64,14 @@ export default function CheckoutPage() {
   const customerName = user?.name || '김토스'
   const customerEmail = user?.email || 'customer123@gmail.com'
 
+  if (user === undefined || !user) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <p className="text-muted-foreground">로그인 확인 중...</p>
+      </div>
+    )
+  }
+
   if (cart.length === 0) {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -78,6 +96,9 @@ export default function CheckoutPage() {
       </Button>
 
       <h1 className="text-2xl font-bold mb-8">결제하기</h1>
+      <p className="text-sm text-muted-foreground mb-6">
+        결제는 로그인 후에만 가능합니다. 장바구니는 로그인 시 서버에 저장됩니다.
+      </p>
 
       <div className="grid md:grid-cols-2 gap-8">
         <div>

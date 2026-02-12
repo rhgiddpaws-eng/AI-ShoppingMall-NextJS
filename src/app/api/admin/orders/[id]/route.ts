@@ -1,135 +1,115 @@
 // =============================================================================
 // 관리자 주문 상세 API - GET/PUT /api/admin/orders/[id]
-// GET: 주문 상세 반환. PUT: deliveryStatus 업데이트
+// GET: 주문 상세(Prisma). PUT: deliveryStatus, shippingAddress 등 업데이트
 // =============================================================================
 
 import { NextResponse } from "next/server"
 import { requireAdminSession } from "@/lib/requireAdminSession"
+import prismaClient from "@/lib/prismaClient"
+import { getCdnUrl } from "@/lib/cdn"
+import type { DeliveryStatus } from "@prisma/client"
 
-// 주문 상세 모킹 데이터
-interface OrderData {
-  id: string;
-  customer: {
-    name: string;
-    email: string;
-    phone: string;
-  };
-  date: string;
-  paymentStatus: string;
-  deliveryStatus: string;
-  paymentMethod: string;
-  shippingAddress: string;
-  items: Array<{
-    id: string;
-    name: string;
-    price: number;
-    quantity: number;
-  }>;
-  subtotal: number;
-  shipping: number;
-  total: number;
-}
-
-const ordersData: { [key: string]: OrderData } = {
-  "ORD-001": {
-    id: "ORD-001",
-    customer: {
-      name: "김민준",
-      email: "minjun@example.com",
-      phone: "010-1234-5678",
-    },
-    date: "2023-07-15",
-    paymentStatus: "결제 완료",
-    deliveryStatus: "배송 완료",
-    paymentMethod: "신용카드",
-    shippingAddress: "서울특별시 강남구 테헤란로 123, 456동 789호",
-    items: [
-      { id: "PRD-001", name: "프리미엄 코튼 티셔츠", price: 39000, quantity: 1 },
-      { id: "PRD-002", name: "슬림핏 데님 청바지", price: 79000, quantity: 1 },
-    ],
-    subtotal: 118000,
-    shipping: 0,
-    total: 118000,
-  },
-  "ORD-002": {
-    id: "ORD-002",
-    customer: {
-      name: "이서연",
-      email: "seoyeon@example.com",
-      phone: "010-2345-6789",
-    },
-    date: "2023-07-14",
-    paymentStatus: "결제 완료",
-    deliveryStatus: "배송 중",
-    paymentMethod: "신용카드",
-    shippingAddress: "부산광역시 해운대구 해운대로 456, 101동 202호",
-    items: [
-      { id: "PRD-003", name: "캐주얼 후드 집업", price: 89000, quantity: 1 },
-      { id: "PRD-005", name: "미니멀 크로스백", price: 59000, quantity: 1 },
-    ],
-    subtotal: 148000,
-    shipping: 0,
-    total: 148000,
-  },
-  "ORD-003": {
-    id: "ORD-003",
-    customer: {
-      name: "박지훈",
-      email: "jihoon@example.com",
-      phone: "010-3456-7890",
-    },
-    date: "2023-07-14",
-    paymentStatus: "결제 완료",
-    deliveryStatus: "배송 준비 중",
-    paymentMethod: "무통장입금",
-    shippingAddress: "인천광역시 연수구 송도동 789번지",
-    items: [{ id: "PRD-001", name: "프리미엄 코튼 티셔츠", price: 39000, quantity: 1 }],
-    subtotal: 39000,
-    shipping: 3000,
-    total: 42000,
-  },
-}
+const DELIVERY_STATUS_VALUES: DeliveryStatus[] = [
+  "ORDER_COMPLETE",
+  "PREPARING",
+  "IN_DELIVERY",
+  "ARRIVING",
+  "DELIVERED",
+]
 
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const auth = await requireAdminSession()
+  const auth = await requireAdminSession(request)
   if ("error" in auth) return auth.error
-  const orderId = (await params).id
+  const id = Number((await params).id)
+  if (!Number.isInteger(id)) {
+    return NextResponse.json({ error: "유효하지 않은 주문 ID" }, { status: 400 })
+  }
 
-  // 해당 ID의 주문이 있는지 확인
-  if (!ordersData[orderId]) {
+  const order = await prismaClient.order.findUnique({
+    where: { id },
+    include: {
+      user: { select: { id: true, email: true, name: true } },
+      items: {
+        include: {
+          product: {
+            select: {
+              id: true,
+              name: true,
+              price: true,
+              images: { select: { thumbnail: true }, take: 1 },
+            },
+          },
+        },
+      },
+      payment: true,
+    },
+  })
+  if (!order) {
     return NextResponse.json({ error: "주문을 찾을 수 없습니다" }, { status: 404 })
   }
 
-  return NextResponse.json(ordersData[orderId])
+  type OrderItemWithProduct = (typeof order)["items"][number]
+  const formatted = {
+    ...order,
+    items: order.items.map((item: OrderItemWithProduct) => ({
+      ...item,
+      product: {
+        ...item.product,
+        imageSrc: getCdnUrl(item.product.images?.[0]?.thumbnail) || "/placeholder.svg",
+      },
+    })),
+  }
+  return NextResponse.json(formatted)
 }
 
 export async function PUT(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const auth = await requireAdminSession()
+  const auth = await requireAdminSession(request)
   if ("error" in auth) return auth.error
-  const orderId = (await params).id
-
-  // 해당 ID의 주문이 있는지 확인
-  if (!ordersData[orderId]) {
-    return NextResponse.json({ error: "주문을 찾을 수 없습니다" }, { status: 404 })
+  const id = Number((await params).id)
+  if (!Number.isInteger(id)) {
+    return NextResponse.json({ error: "유효하지 않은 주문 ID" }, { status: 400 })
   }
 
   try {
-    const { deliveryStatus } = await request.json()
+    const body = await request.json()
+    const { deliveryStatus, shippingAddress, shippingLat, shippingLng } = body as {
+      deliveryStatus?: string
+      shippingAddress?: string
+      shippingLat?: number
+      shippingLng?: number
+    }
 
-    // 실제 구현에서는 데이터베이스에 업데이트하는 로직이 들어갑니다
-    // 여기서는 간단히 성공 응답만 반환합니다
+    const updateData: {
+      deliveryStatus?: DeliveryStatus
+      shippingAddress?: string
+      shippingLat?: number
+      shippingLng?: number
+    } = {}
+    if (deliveryStatus && DELIVERY_STATUS_VALUES.includes(deliveryStatus as DeliveryStatus)) {
+      updateData.deliveryStatus = deliveryStatus as DeliveryStatus
+    }
+    if (shippingAddress !== undefined) updateData.shippingAddress = shippingAddress
+    if (shippingLat !== undefined) updateData.shippingLat = shippingLat
+    if (shippingLng !== undefined) updateData.shippingLng = shippingLng
 
-    return NextResponse.json({
-      ...ordersData[orderId],
-      deliveryStatus,
+    const order = await prismaClient.order.update({
+      where: { id },
+      data: updateData,
+      include: {
+        user: { select: { id: true, email: true, name: true } },
+        items: { include: { product: { select: { id: true, name: true, price: true } } } },
+        payment: true,
+      },
     })
+    return NextResponse.json(order)
   } catch (error) {
+    console.error("주문 상태 업데이트 실패:", error)
     return NextResponse.json({ error: "주문 상태 업데이트 실패" }, { status: 400 })
   }
 }

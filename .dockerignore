@@ -1,0 +1,41 @@
+# 의존성·빌드 결과 (컨테이너에서 새로 설치/빌드)
+node_modules
+.next
+.turbo
+
+# 문서·자료 (앱 빌드 불필요)
+DOCUMENT
+기타자료
+
+# 스크립트용 이미지/대용량 (앱 서빙 불필요)
+scripts/products
+scripts/products_before
+scripts/18.png
+scripts/*.png
+scripts/새로운*상품데이터*
+scripts/새로운 상품데이터
+scripts/새로운 상품데이터 클론
+
+# Git
+.git
+.gitignore
+
+# 실행파일·기타
+ngrok.exe
+*.exe
+
+# 로컬 env (배포 시 compose env_file 로 주입)
+.env
+.env.host
+.env.local
+.env.production
+.env.*.local
+
+# IDE·OS
+.idea
+.vscode
+*.swp
+.DS_Store
+Thumbs.db
+
+# prisma는 제외하지 않음 (Dockerfile에서 npx prisma generate 사용)

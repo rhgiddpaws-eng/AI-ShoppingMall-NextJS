@@ -71,11 +71,11 @@ export default function CartItem({ item }: CartItemProps) {
         <Image src={item.imageSrc || "/placeholder.svg"} alt={item.name} fill sizes="96px" className="object-cover rounded-md" />
       </div>
 
-      <div className="flex-grow">
-        <Link href={`/product/${item.id}`} className="font-medium hover:underline">
+      <div className="flex-grow min-w-0">
+        <Link href={`/product/${item.id}`} className="font-medium hover:underline line-clamp-2 break-words block">
           {item.name}
         </Link>
-        {item.category && <p className="text-sm text-muted-foreground">{item.category}</p>}
+        {item.category && <p className="text-sm text-muted-foreground truncate">{item.category}</p>}
       </div>
 
       <div className="flex items-center mt-4 sm:mt-0 sm:ml-4">

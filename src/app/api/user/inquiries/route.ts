@@ -4,17 +4,17 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import prismaClient from '@/lib/prismaClient'
-import { getSession } from '@/lib/ironSessionControl'
+import { getAuthFromRequest } from '@/lib/authFromRequest'
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const session = await getSession()
-    if (!session?.id || !session.isLoggedIn) {
+    const auth = await getAuthFromRequest(request)
+    if (!auth?.id) {
       return NextResponse.json({ error: '인증이 필요합니다' }, { status: 401 })
     }
 
     const list = await prismaClient.inquiry.findMany({
-      where: { userId: session.id },
+      where: { userId: auth.id },
       orderBy: { createdAt: 'desc' },
       select: {
         id: true,
@@ -39,8 +39,8 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getSession()
-    if (!session?.id || !session.isLoggedIn) {
+    const auth = await getAuthFromRequest(request)
+    if (!auth?.id) {
       return NextResponse.json({ error: '인증이 필요합니다' }, { status: 401 })
     }
 
@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
     // orderId가 있으면 해당 주문이 현재 사용자 소유인지 확인
     if (orderId != null) {
       const order = await prismaClient.order.findFirst({
-        where: { id: orderId, userId: session.id },
+        where: { id: orderId, userId: auth.id },
       })
       if (!order) {
         return NextResponse.json(
@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
 
     const inquiry = await prismaClient.inquiry.create({
       data: {
-        userId: session.id,
+        userId: auth.id,
         orderId: orderId ?? null,
         message,
         attachmentKeys,
