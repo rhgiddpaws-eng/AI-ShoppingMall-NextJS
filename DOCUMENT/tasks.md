@@ -23,8 +23,8 @@
 ## 2. 상세페이지 추천 상품 (도커)
 
 - [x] 추천 API: Prisma $queryRawUnsafe + DATABASE_URL 단일 연결로 전환 (pgClient 제거)
-- [ ] 도커 env: PG_HOST=ecommerce_db, PG_PORT=5432 (다른 pgClient 사용처 있을 시만)
-- [ ] 도커에서 추천 상품 로드 성공 검증
+- [x] 도커 env: PG_HOST=ecommerce_db, PG_PORT=5432 (다른 pgClient 사용처 있을 시만)
+- [x] 도커에서 추천 상품 로드 성공 검증
 
 ---
 
@@ -40,7 +40,7 @@
 - [x] api/login/route.ts 응답에 JWT 추가
 - [x] API 라우트: getAuthFromRequest (JWT + 세션 fallback) 적용 (cart, wishlist, confirm, admin, orders, inquiries)
 - [x] 클라이언트: 로그인 후 token 저장, authFetchOpts / checkout success에서 Authorization 헤더
-- [ ] middleware.ts 공개 경로 제외 JWT 검증 (선택)
+- [x] middleware.ts 공개 경로 제외 JWT 검증 (선택)
 
 ---
 
@@ -60,6 +60,7 @@
 - [x] uplot 패키지 추가
 - [x] 대시보드 매출 추이 Recharts → SalesChartUplot(uPlot) 교체
 - [x] 주/월/연 탭 및 /api/admin/dashboard?period= 유지
+- [x] 차트 시각화 개선 (추세선, 폰트 크기, X축 라벨 버그 수정)
 
 ---
 

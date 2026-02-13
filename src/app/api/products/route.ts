@@ -13,16 +13,26 @@ export type ProductWithImages = Product & {
 
 export type ProductsResponseType = ProductWithImages[]
 
+/** orderBy에 사용 가능한 Product 필드 (Prisma 쿼리 오류 방지) */
+const ALLOWED_SORT_KEYS = ['id', 'name', 'price', 'createdAt', 'updatedAt'] as const
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
 
   const category = searchParams.get('category')
     ? searchParams.get('category')?.toUpperCase()
     : null
-  const limit = searchParams.get('limit') || '20'
-  const sort = searchParams.get('sort') || 'createdAt'
-  const order = searchParams.get('order') || 'desc'
+  const limitRaw = searchParams.get('limit') || '20'
+  const sortRaw = searchParams.get('sort') || 'createdAt'
+  const orderRaw = searchParams.get('order') || 'desc'
   const term = searchParams.get('term') || ''
+
+  const sort = ALLOWED_SORT_KEYS.includes(sortRaw as (typeof ALLOWED_SORT_KEYS)[number])
+    ? sortRaw
+    : 'createdAt'
+  const order = orderRaw === 'asc' || orderRaw === 'desc' ? orderRaw : 'desc'
+  const parsedLimit = parseInt(limitRaw, 10)
+  const take = Number.isNaN(parsedLimit) || parsedLimit < 1 ? 20 : Math.min(parsedLimit, 100)
 
   try {
     const products = await prismaClient.product.findMany({
@@ -36,12 +46,12 @@ export async function GET(request: NextRequest) {
           },
         }),
       },
-      take: limit ? parseInt(limit) : undefined,
+      take,
       include: {
         images: true,
       },
       orderBy: {
-        [sort as string]: order as 'asc' | 'desc',
+        [sort]: order,
       },
     })
 
@@ -62,7 +72,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(products)
   } catch (error) {
-    console.error('Failed to fetch products:', error)
+    const err = error instanceof Error ? error : new Error(String(error))
+    console.error('Failed to fetch products:', err.message, err.stack)
     return NextResponse.json(
       { error: 'Failed to fetch products' },
       { status: 500 },
