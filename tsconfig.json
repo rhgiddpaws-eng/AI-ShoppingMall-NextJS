@@ -35,6 +35,9 @@
     ".next/types/**/*.ts"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    // 배포 빌드에서는 실행 스크립트/시드 파일 타입체크를 제외해 빌드 실패를 방지한다.
+    "scripts/**/*.ts",
+    "prisma/**/*.ts"
   ]
 }
