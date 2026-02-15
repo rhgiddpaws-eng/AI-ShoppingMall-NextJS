@@ -5,9 +5,10 @@
 // =============================================================================
 
 import { NextResponse } from "next/server"
-import type { DeliveryStatus } from "@prisma/client"
 import prismaClient from "@/lib/prismaClient"
 import { requireAdminSession } from "@/lib/requireAdminSession"
+// 배포 환경에서 Prisma enum export 차이로 빌드가 깨지는 일을 막기 위해 로컬 enum 타입을 사용합니다.
+import type { DeliveryStatus } from "@/lib/orderEnums"
 
 const DELIVERY_STATUS_VALUES: DeliveryStatus[] = [
   "ORDER_COMPLETE",

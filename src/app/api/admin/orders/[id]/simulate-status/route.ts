@@ -4,11 +4,12 @@
 // =============================================================================
 
 import { NextResponse } from "next/server"
-import type { DeliveryProvider, DeliveryStatus } from "@prisma/client"
 import prismaClient from "@/lib/prismaClient"
 import { requireAdminSession } from "@/lib/requireAdminSession"
 import { geocodeAddress } from "@/lib/naverGeocode"
 import type { PrismaTransactionClient } from "@/lib/prismaTransactionClient"
+// 배포 환경에서 Prisma enum export 차이로 빌드가 깨지는 일을 막기 위해 로컬 enum 타입을 사용합니다.
+import type { DeliveryProvider, DeliveryStatus } from "@/lib/orderEnums"
 import {
   mapExternalStatusToDeliveryStatus,
   normalizeExternalStatus,
