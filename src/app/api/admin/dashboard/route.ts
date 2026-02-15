@@ -8,6 +8,20 @@ import { requireAdminSession } from "@/lib/requireAdminSession"
 import prisma from "@/lib/prismaClient"
 
 type SalesOrderAmountRow = { totalAmount: number }
+type RecentOrderRow = {
+  id: number
+  user: { name: string | null; email: string }
+  createdAt: Date
+  deliveryStatus: string | null
+  status: string
+  totalAmount: number
+}
+type LowStockProductRow = {
+  id: number
+  name: string
+  stock: number
+  category: string | null
+}
 
 // 매출 합계 계산을 공통화해 reduce 콜백 파라미터 타입 오류를 방지한다.
 function sumTotalAmount(rows: SalesOrderAmountRow[]): number {
@@ -326,7 +340,8 @@ async function getDashboardData(period: "week" | "month" | "year") {
       refundRequests: canceledOrders,
       exchangeRequests: 0, // 援먰솚 ?붿껌? 蹂꾨룄 ?뚯씠釉붿씠 ?꾩슂?섎?濡?0?쇰줈 ?ㅼ젙
     },
-    recentOrders: recentOrders.map((order) => ({
+    // Vercel 빌드 환경에서 Prisma 타입 추론이 약해져도 안정적으로 컴파일되도록 콜백 타입을 명시한다.
+    recentOrders: recentOrders.map((order: RecentOrderRow) => ({
       id: `ORD-${order.id.toString().padStart(3, "0")}`,
       customer: order.user.name || order.user.email,
       date: order.createdAt.toISOString().split("T")[0],
@@ -341,7 +356,8 @@ async function getDashboardData(period: "week" | "month" | "year") {
               : "Pending",
       amount: Math.round(order.totalAmount),
     })),
-    lowStockProducts: lowStockProductsList.map((product) => ({
+    // 동일한 이유로 재고 목록 매핑도 콜백 타입을 명시한다.
+    lowStockProducts: lowStockProductsList.map((product: LowStockProductRow) => ({
       id: `PRD-${product.id.toString().padStart(3, "0")}`,
       name: product.name,
       stock: product.stock,
