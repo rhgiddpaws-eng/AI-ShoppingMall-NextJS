@@ -3,7 +3,8 @@
  * 1000개의 주문을 최근 5년간 고루 분산하여 생성
  */
 
-import { PrismaClient } from "@prisma/client"
+// Prisma Client 생성 시점 차이로 빌드가 깨지지 않도록 require 방식을 사용한다.
+const { PrismaClient } = require("@prisma/client")
 
 const prisma = new PrismaClient()
 
