@@ -58,3 +58,8 @@ ngrok.exe
 # 스크립트 산출물 (이미지·임시 데이터 등)
 scripts/products_before/
 scripts/products/
+# force ignore docs/material folders and local agent log
+기타자료/
+docs/
+DOCUMENT/
+.codex-dev.log
