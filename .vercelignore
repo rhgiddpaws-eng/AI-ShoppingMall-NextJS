@@ -14,6 +14,10 @@ DOCUMENT
 docs
 기타자료
 
+# Local data/assets (not needed for deploy)
+scripts/products
+scripts/products_before
+
 # Local tools / logs
 .playwright-mcp
 .codex-dev.log
