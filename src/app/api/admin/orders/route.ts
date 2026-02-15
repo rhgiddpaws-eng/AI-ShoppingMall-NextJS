@@ -70,7 +70,9 @@ export async function GET(request: Request) {
 
   const nextCursor = orders.length === limit ? orders[orders.length - 1].id : null
 
-  const formatted = orders.map((order) => ({
+  // Vercel 타입체크에서 map 콜백 파라미터가 any로 추론되지 않도록 주문 행 타입을 고정합니다.
+  type AdminOrderRow = (typeof orders)[number]
+  const formatted = orders.map((order: AdminOrderRow) => ({
     id: order.id,
     createdAt: order.createdAt,
     totalAmount: order.totalAmount,
