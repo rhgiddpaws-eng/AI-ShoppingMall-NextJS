@@ -15,6 +15,10 @@ type DispatchPayload = {
   trackingNumber?: string | null
 }
 
+type DispatchOrderItemSummary = {
+  product: { name: string }
+}
+
 const DEFAULT_STORE_LAT = 37.480783
 const DEFAULT_STORE_LNG = 126.89711
 const TEST_FALLBACK_SHIPPING_ADDRESS = "테스트 배송지 미입력 - 실제 배송 전에는 주소를 꼭 입력해 주세요."
@@ -157,7 +161,8 @@ export async function POST(
       trackingNumber: resolvedTrackingNumber,
       receiverName: order.user.name,
       totalAmount: order.totalAmount,
-      itemSummary: order.items.map((item) => item.product.name),
+      // Vercel 빌드 환경에서도 item 콜백 파라미터가 any로 떨어지지 않게 타입을 명시한다.
+      itemSummary: order.items.map((item: DispatchOrderItemSummary) => item.product.name),
     })
 
     const isRedispatchFromDelivered = shouldResetDeliveryCycle({
