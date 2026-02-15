@@ -8,6 +8,7 @@ import prismaClient from '@/lib/prismaClient'
 import { OrderStatus, PaymentStatus } from '@prisma/client'
 import { getAuthFromRequest } from '@/lib/authFromRequest'
 import { CartItem } from '@/lib/cart'
+import { geocodeAddress } from '@/lib/naverGeocode'
 
 export async function POST(req: Request) {
   try {
@@ -23,6 +24,11 @@ export async function POST(req: Request) {
     const userId = auth.id
 
     const parsedData = typeof data === 'string' ? JSON.parse(data) : data
+    const shippingAddress =
+      typeof parsedData?.address === "string" ? parsedData.address.trim() : ""
+    const geocodedShipping = shippingAddress
+      ? await geocodeAddress(shippingAddress)
+      : null
     const totalAmount = Number(amount) || 0
     if (!parsedData?.cart?.length || totalAmount <= 0) {
       return NextResponse.json(
@@ -39,6 +45,9 @@ export async function POST(req: Request) {
           totalAmount,
           status: OrderStatus.PAID,
           userId,
+          shippingAddress: shippingAddress || null,
+          shippingLat: geocodedShipping?.lat ?? null,
+          shippingLng: geocodedShipping?.lng ?? null,
           items: {
             create: parsedData.cart.map((item: CartItem) => ({
               productId: +item.id,

@@ -68,7 +68,8 @@ export default function AdminDashboard() {
       <h1 className="text-2xl font-bold mb-6">대시보드</h1>
 
       {/* 매출 추이 + 최근 주문 한 줄 (오른쪽 허전함 해소) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+      {/* 화면 폭이 커져도 겹치지 않도록 최근 주문을 차트 아래로 배치한다. */}
+      <div className="grid grid-cols-1 gap-6 mb-6">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle>매출 추이</CardTitle>
@@ -236,4 +237,3 @@ export default function AdminDashboard() {
     </div>
   )
 }
-

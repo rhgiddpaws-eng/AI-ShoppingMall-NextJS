@@ -57,6 +57,7 @@ import { useIntersection } from '@/hooks/use-intersection'
 import { getCdnUrl } from '@/lib/cdn'
 import { getDeliveryStatusLabel } from '@/lib/deliveryStatus'
 import { OrderStatus, PaymentStatus } from '@/lib/orderEnums'
+import { NaverDeliveryMap } from '@/components/naver-delivery-map'
 import {
   OrdersResponse,
   OrdersQueryParams,
@@ -95,6 +96,8 @@ export function OrderHistory() {
   const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null)
   const [isOrderDetailsOpen, setIsOrderDetailsOpen] = useState(false)
   const [statusFilter, setStatusFilter] = useState<OrderStatus | null>(null)
+  const storeLat = Number(process.env.NEXT_PUBLIC_STORE_LAT ?? '37.480783')
+  const storeLng = Number(process.env.NEXT_PUBLIC_STORE_LNG ?? '126.897110')
 
   // 무한 스크롤을 위한 IntersectionObserver 설정
   const loadMoreRef = useRef<HTMLDivElement>(null)
@@ -271,6 +274,20 @@ export function OrderHistory() {
   }
 
   if (isOrderDetailsOpen && selectedOrder) {
+    const hasSelectedShippingCoordinates =
+      'shippingLat' in selectedOrder &&
+      'shippingLng' in selectedOrder &&
+      selectedOrder.shippingLat != null &&
+      selectedOrder.shippingLng != null
+    const resolvedShippingLat = hasSelectedShippingCoordinates
+      ? selectedOrder.shippingLat
+      : storeLat
+    const resolvedShippingLng = hasSelectedShippingCoordinates
+      ? selectedOrder.shippingLng
+      : storeLng
+    const selectedShippingAddress =
+      'shippingAddress' in selectedOrder ? selectedOrder.shippingAddress : null
+
     return (
       <div>
         <div className="flex items-center mb-6">
@@ -402,6 +419,33 @@ export function OrderHistory() {
               </CardContent>
             </Card>
           </div>
+
+          <Card className="mt-4">
+            <CardContent className="p-4">
+              <h4 className="font-medium mb-4">배송 지도</h4>
+              {!hasSelectedShippingCoordinates ? (
+                // 지오코딩 실패/누락 주문도 지도를 유지해 배송 추적 흐름이 끊기지 않게 합니다.
+                <p className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                  배송지 좌표를 아직 확보하지 못해 매장 기준 폴백 지도를 표시합니다.
+                </p>
+              ) : null}
+              <NaverDeliveryMap
+                shippingLat={resolvedShippingLat}
+                shippingLng={resolvedShippingLng}
+                shippingAddress={selectedShippingAddress}
+                storeLat={storeLat}
+                storeLng={storeLng}
+                storeLabel="매장"
+                customerLabel={hasSelectedShippingCoordinates ? "내 배송지" : "배송지 좌표 확인중"}
+                riderLat={'riderLat' in selectedOrder ? selectedOrder.riderLat : null}
+                riderLng={'riderLng' in selectedOrder ? selectedOrder.riderLng : null}
+                deliveryStatus={
+                  'deliveryStatus' in selectedOrder ? selectedOrder.deliveryStatus : null
+                }
+                riderLabel="배달원"
+              />
+            </CardContent>
+          </Card>
         </div>
 
         <div className="flex justify-center mt-6">

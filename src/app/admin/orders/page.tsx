@@ -1,19 +1,16 @@
 'use client'
 // =============================================================================
-// 관리자 주문 관리 - /admin/orders
-// 주문 검색·상태 필터, 주문 목록 테이블, 배송 상태 변경(PUT /api/admin/orders)
+// 관리자 주문 목록 - /admin/orders
+// 실DB 목록 API를 사용해 주문/배송/택배 정보를 조회하고 배송 상태를 변경합니다.
 // =============================================================================
 
-import { useState, useEffect } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import {
-  Search,
-  Filter,
-  ChevronDown,
-  MoreHorizontal,
-  Calendar,
-} from 'lucide-react'
+import { Calendar, MoreHorizontal, Search } from 'lucide-react'
+import { toast } from 'sonner'
 
+import { useAuthStore } from '@/lib/store'
+import { getDeliveryStatusLabel, DELIVERY_STATUS_LIST } from '@/lib/deliveryStatus'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -39,92 +36,123 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { toast } from 'sonner'
-interface Order {
-  id: string
-  customer: string
-  date: string
-  items: number
-  total: number
-  paymentStatus: string
-  deliveryStatus: string
+
+interface AdminOrderRow {
+  id: number
+  createdAt: string
+  totalAmount: number
+  status: string
+  deliveryStatus: string | null
+  deliveryProvider: string | null
+  externalDeliveryStatus: string | null
+  courierCode: string | null
+  trackingNumber: string | null
+  trackingUrl: string | null
+  itemCount: number
+  customerName: string | null
+  customerEmail: string
+  paymentStatus: string | null
 }
 
-/** 주문 관리: 검색/필터 후 목록 표시, 배송 상태 변경 시 API 호출 및 목록 갱신 */
+interface AdminOrdersResponse {
+  orders: AdminOrderRow[]
+  nextCursor: number | null
+}
+
+/** 주문 목록 페이지는 검색/필터 변경 시 첫 페이지부터 다시 조회합니다. */
 export default function OrdersPage() {
+  const token = useAuthStore((s) => s.token)
+
   const [searchTerm, setSearchTerm] = useState('')
-  const [statusFilter, setStatusFilter] = useState('all')
-  const [orders, setOrders] = useState<Order[]>([])
+  const [deliveryStatusFilter, setDeliveryStatusFilter] = useState<string>('all')
+  const [orders, setOrders] = useState<AdminOrderRow[]>([])
+  const [nextCursor, setNextCursor] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+
+  const authHeaders = useMemo(
+    () => ({
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    }),
+    [token],
+  )
+
+  const fetchOrders = async (append: boolean) => {
+    try {
+      if (append) {
+        setLoadingMore(true)
+      } else {
+        setLoading(true)
+      }
+
+      const url = new URL('/api/admin/orders', window.location.origin)
+      if (searchTerm.trim()) url.searchParams.set('search', searchTerm.trim())
+      if (deliveryStatusFilter !== 'all') url.searchParams.set('deliveryStatus', deliveryStatusFilter)
+      url.searchParams.set('limit', '30')
+      if (append && nextCursor != null) {
+        url.searchParams.set('cursor', String(nextCursor))
+      }
+
+      const response = await fetch(url.toString(), {
+        credentials: 'include',
+        headers: authHeaders,
+      })
+      if (!response.ok) throw new Error('주문 목록을 불러오지 못했습니다.')
+
+      const data = (await response.json()) as AdminOrdersResponse
+      setOrders((prev) => (append ? [...prev, ...data.orders] : data.orders))
+      setNextCursor(data.nextCursor)
+    } catch (error) {
+      console.error('주문 목록 조회 오류:', error)
+      toast.error('주문 목록을 불러오지 못했습니다.')
+    } finally {
+      setLoading(false)
+      setLoadingMore(false)
+    }
+  }
 
   useEffect(() => {
-    const fetchOrders = async () => {
-      try {
-        const url = new URL('/api/admin/orders', window.location.origin)
-        if (searchTerm) url.searchParams.append('search', searchTerm)
-        if (statusFilter !== 'all')
-          url.searchParams.append('status', statusFilter)
+    const timer = window.setTimeout(() => {
+      setNextCursor(null)
+      void fetchOrders(false)
+    }, 250)
+    return () => window.clearTimeout(timer)
+  }, [searchTerm, deliveryStatusFilter, authHeaders])
 
-        const response = await fetch(url)
-        if (!response.ok) {
-          throw new Error('주문 데이터를 불러오는데 실패했습니다')
-        }
-        const data = await response.json()
-        setOrders(data)
-      } catch (error) {
-        console.error('주문 데이터 로딩 오류:', error)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    // 검색어 입력 시 디바운스 적용
-    const timer = setTimeout(() => {
-      fetchOrders()
-    }, 300)
-
-    return () => clearTimeout(timer)
-  }, [searchTerm, statusFilter])
-
-  const handleStatusChange = async (orderId: string, newStatus: string) => {
+  const handleStatusChange = async (orderId: number, newStatus: string) => {
     try {
       const response = await fetch('/api/admin/orders', {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        credentials: 'include',
+        headers: authHeaders,
         body: JSON.stringify({ orderId, deliveryStatus: newStatus }),
       })
 
+      const result = await response.json().catch(() => ({}))
       if (!response.ok) {
-        throw new Error('배송 상태 업데이트에 실패했습니다')
+        throw new Error(result?.error || '배송 상태 변경에 실패했습니다.')
       }
 
-      const result = await response.json()
-
-      // 상태 업데이트 성공 시 주문 목록 갱신
-      setOrders(
-        orders.map(order =>
-          order.id === orderId
-            ? { ...order, deliveryStatus: newStatus }
-            : order,
+      setOrders((prev) =>
+        prev.map((order) =>
+          order.id === orderId ? { ...order, deliveryStatus: newStatus } : order,
         ),
       )
-
-      toast.success(result.message)
+      toast.success(result?.message || `주문 #${orderId} 배송 상태를 변경했습니다.`)
     } catch (error) {
-      console.error('배송 상태 업데이트 오류:', error)
-      toast.error('배송 상태 변경에 실패했습니다.')
+      console.error('배송 상태 변경 오류:', error)
+      toast.error(error instanceof Error ? error.message : '배송 상태 변경에 실패했습니다.')
     }
   }
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-bold">주문 관리</h1>
         <Button variant="outline">
-          <Calendar className="h-4 w-4 mr-2" />
-          기간 설정
+          <Calendar className="mr-2 h-4 w-4" />
+          최근 주문
         </Button>
       </div>
 
@@ -133,33 +161,29 @@ export default function OrdersPage() {
           <CardTitle>주문 검색</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1 relative">
+          <div className="flex flex-col gap-4 md:flex-row">
+            <div className="relative flex-1">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="주문번호 또는 고객명으로 검색"
+                placeholder="주문번호 / 고객명 / 이메일 / 송장번호"
                 className="pl-8"
                 value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
+                onChange={(event) => setSearchTerm(event.target.value)}
               />
             </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[180px]">
+            <Select value={deliveryStatusFilter} onValueChange={setDeliveryStatusFilter}>
+              <SelectTrigger className="w-[200px]">
                 <SelectValue placeholder="배송 상태" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">모든 상태</SelectItem>
-                <SelectItem value="결제 대기">결제 대기</SelectItem>
-                <SelectItem value="배송 준비 중">배송 준비 중</SelectItem>
-                <SelectItem value="배송 중">배송 중</SelectItem>
-                <SelectItem value="배송 완료">배송 완료</SelectItem>
+                {DELIVERY_STATUS_LIST.map((status) => (
+                  <SelectItem key={status} value={status}>
+                    {getDeliveryStatusLabel(status)}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
-            <Button variant="outline">
-              <Filter className="h-4 w-4 mr-2" />
-              필터
-              <ChevronDown className="h-4 w-4 ml-1" />
-            </Button>
           </div>
         </CardContent>
       </Card>
@@ -167,62 +191,66 @@ export default function OrdersPage() {
       <Card>
         <CardContent className="p-0">
           {loading ? (
-            <div className="flex justify-center items-center h-64">
-              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+            <div className="flex h-64 items-center justify-center">
+              <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-t-2 border-primary" />
             </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>주문번호</TableHead>
-                  <TableHead>고객명</TableHead>
-                  <TableHead>주문일자</TableHead>
+                  <TableHead>고객</TableHead>
+                  <TableHead>주문일</TableHead>
                   <TableHead>상품수</TableHead>
                   <TableHead>총액</TableHead>
-                  <TableHead>결제상태</TableHead>
-                  <TableHead>배송상태</TableHead>
+                  <TableHead>결제</TableHead>
+                  <TableHead>배송 상태</TableHead>
+                  <TableHead>택배 정보</TableHead>
                   <TableHead className="text-right">관리</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {orders.length > 0 ? (
-                  orders.map(order => (
+                  orders.map((order) => (
                     <TableRow key={order.id}>
-                      <TableCell className="font-medium">{order.id}</TableCell>
-                      <TableCell>{order.customer}</TableCell>
-                      <TableCell>{order.date}</TableCell>
-                      <TableCell>{order.items}개</TableCell>
-                      <TableCell>{order.total.toLocaleString()}원</TableCell>
+                      <TableCell className="font-medium">#{order.id}</TableCell>
                       <TableCell>
-                        <Badge
-                          variant={
-                            order.paymentStatus === '결제 완료'
-                              ? 'default'
-                              : 'destructive'
-                          }
-                        >
-                          {order.paymentStatus}
+                        <div className="font-medium">{order.customerName ?? '-'}</div>
+                        <div className="text-xs text-muted-foreground">{order.customerEmail}</div>
+                      </TableCell>
+                      <TableCell>{new Date(order.createdAt).toLocaleDateString('ko-KR')}</TableCell>
+                      <TableCell>{order.itemCount}개</TableCell>
+                      <TableCell>{order.totalAmount.toLocaleString()}원</TableCell>
+                      <TableCell>
+                        <Badge variant={order.status === 'PAID' ? 'default' : 'secondary'}>
+                          {order.paymentStatus ?? order.status}
                         </Badge>
                       </TableCell>
                       <TableCell>
                         <Select
-                          defaultValue={order.deliveryStatus}
-                          onValueChange={value =>
-                            handleStatusChange(order.id, value)
-                          }
+                          value={order.deliveryStatus ?? 'ORDER_COMPLETE'}
+                          onValueChange={(value) => void handleStatusChange(order.id, value)}
                         >
                           <SelectTrigger className="h-8 w-[140px]">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="결제 대기">결제 대기</SelectItem>
-                            <SelectItem value="배송 준비 중">
-                              배송 준비 중
-                            </SelectItem>
-                            <SelectItem value="배송 중">배송 중</SelectItem>
-                            <SelectItem value="배송 완료">배송 완료</SelectItem>
+                            {DELIVERY_STATUS_LIST.map((status) => (
+                              <SelectItem key={status} value={status}>
+                                {getDeliveryStatusLabel(status)}
+                              </SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
+                      </TableCell>
+                      <TableCell className="max-w-[220px]">
+                        <div className="truncate text-xs text-muted-foreground">
+                          {order.deliveryProvider ?? '-'} / {order.courierCode ?? '-'}
+                        </div>
+                        <div className="truncate text-xs">{order.trackingNumber ?? '-'}</div>
+                        <div className="truncate text-xs text-muted-foreground">
+                          {order.externalDeliveryStatus ?? '-'}
+                        </div>
                       </TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
@@ -234,14 +262,15 @@ export default function OrdersPage() {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem asChild>
-                              <Link href={`/admin/orders/${order.id}`}>
-                                상세 정보
-                              </Link>
+                              <Link href={`/admin/orders/${order.id}`}>상세 정보</Link>
                             </DropdownMenuItem>
-                            <DropdownMenuItem>배송 상태 변경</DropdownMenuItem>
-                            <DropdownMenuItem className="text-destructive">
-                              주문 취소
-                            </DropdownMenuItem>
+                            {order.trackingUrl ? (
+                              <DropdownMenuItem asChild>
+                                <a href={order.trackingUrl} target="_blank" rel="noreferrer">
+                                  배송 조회 링크
+                                </a>
+                              </DropdownMenuItem>
+                            ) : null}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
@@ -249,10 +278,8 @@ export default function OrdersPage() {
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-6">
-                      {searchTerm || statusFilter !== 'all'
-                        ? '검색 결과가 없습니다.'
-                        : '주문 데이터가 없습니다.'}
+                    <TableCell colSpan={9} className="py-6 text-center">
+                      조회 결과가 없습니다.
                     </TableCell>
                   </TableRow>
                 )}
@@ -261,6 +288,14 @@ export default function OrdersPage() {
           )}
         </CardContent>
       </Card>
+
+      {nextCursor != null ? (
+        <div className="mt-4 flex justify-center">
+          <Button variant="outline" disabled={loadingMore} onClick={() => void fetchOrders(true)}>
+            {loadingMore ? '불러오는 중...' : '더 보기'}
+          </Button>
+        </div>
+      ) : null}
     </div>
   )
 }

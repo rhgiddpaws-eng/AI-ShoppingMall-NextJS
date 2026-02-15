@@ -120,13 +120,13 @@ export default function ProductCard({
       onMouseLeave={() => setIsHovered(false)}
     >
       <div className="relative rounded-lg overflow-hidden">
-        <div className="aspect-[3/4] relative bg-muted">
+        <div className="aspect-[7/8] w-full relative bg-muted border border-gray-200 rounded-lg">
           <Image
             src={imageSrc || '/placeholder.svg'}
             alt={name}
             fill
             sizes="(min-width: 1024px) 25vw, (min-width: 768px) 33vw, 50vw"
-            className="object-cover transition-transform duration-300 group-hover:scale-105"
+            className="scale-104 object-cover transition-transform duration-300 group-hover:scale-110"
             priority
           />
 
@@ -161,9 +161,8 @@ export default function ProductCard({
             <Button
               size="sm"
               variant="outline"
-              className={`bg-transparent border-white/50 hover:bg-white/20 hover:text-white cursor-pointer ${
-                isWishlisted ? 'text-red-500' : 'text-white'
-              }`}
+              className={`bg-transparent border-white/50 hover:bg-white/20 hover:text-white cursor-pointer ${isWishlisted ? 'text-red-500' : 'text-white'
+                }`}
               onClick={handleToggleWishlist}
             >
               <Heart
@@ -173,8 +172,8 @@ export default function ProductCard({
           </div>
         </div>
 
-        <div className="mt-2">
-          <h3 className="font-medium text-sm line-clamp-2 min-w-0 break-words">{name}</h3>
+        <div className="mt-2 py-4">
+          <h3 className="font-medium text-md line-clamp-2 min-w-0 break-words">{name}</h3>
           <p className="text-xs text-muted-foreground mb-1">{category}</p>
           <div className="flex items-center gap-2">
             {isSale && salePrice ? (

@@ -33,51 +33,51 @@ async function main() {
   const embeddings = embedding.data[0].embedding
   console.log('embedding', embeddings)
 
-    // 프로젝트 루트 기준
-    // const imagePath = path.resolve('./scripts/products/1/1.png')  
-    // 이미지 파일 경로 (현재 스크립트 파일 위치 기준: scripts/products/1/1.png)
-    const imagePath = path.join(__dirname, 'products', '1', '1.png')
-    // 파일 존재 여부 확인
-    if (!fs.existsSync(imagePath)) {
-      console.error('이미지 파일이 존재하지 않습니다:', imagePath)
-      return
-    }
-    // 파일 타입 확인
-    const fileType = mime.lookup(imagePath)
-    if (!fileType) {
-      console.error('파일 타입을 확인할 수 없습니다')
-      return
-    }
-    // API_BASE_URL(또는 http://localhost:3000)은 “파일을 저장하는 서버”가 아니라, 
-    // Presigned URL을 만들어 주는 API 서버 주소입니다.
-    const presignedResponse = await fetch(
-      `http://localhost:3000/api/presignedUrl?fileType=${fileType}&bucketPath=products`,
-      { method: 'GET' }
-    )
+  // 프로젝트 루트 기준
+  // const imagePath = path.resolve('./scripts/products/1/1.png')  
+  // 이미지 파일 경로 (현재 스크립트 파일 위치 기준: scripts/products/1/1.png)
+  const imagePath = path.join(__dirname, 'products', '1', '1.png')
+  // 파일 존재 여부 확인
+  if (!fs.existsSync(imagePath)) {
+    console.error('이미지 파일이 존재하지 않습니다:', imagePath)
+    return
+  }
+  // 파일 타입 확인
+  const fileType = mime.lookup(imagePath)
+  if (!fileType) {
+    console.error('파일 타입을 확인할 수 없습니다')
+    return
+  }
+  // API_BASE_URL(또는 http://localhost:3000)은 “파일을 저장하는 서버”가 아니라, 
+  // Presigned URL을 만들어 주는 API 서버 주소입니다.
+  const presignedResponse = await fetch(
+    `http://localhost:3000/api/presignedUrl?fileType=${fileType}&bucketPath=products`,
+    { method: 'GET' }
+  )
 
-    // Presigned URL(일회성 업로드 주소)과 S3에 저장될 파일 키(경로) 받기
-    const { uploadUrl, key } = await presignedResponse.json()
-    console.log('Presigned URL 발급 완료:', uploadUrl)
-    console.log('S3 키:', key)
+  // Presigned URL(일회성 업로드 주소)과 S3에 저장될 파일 키(경로) 받기
+  const { uploadUrl, key } = await presignedResponse.json()
+  console.log('Presigned URL 발급 완료:', uploadUrl)
+  console.log('S3 키:', key)
 
-    // 파일 내용 읽기
-    const fileContent = fs.readFileSync(imagePath)
-    
-    // 파일 업로드
-    const uploadResponse = await fetch(uploadUrl, {
-      method: 'PUT',
-      body: fileContent,
-      headers: {
-        'Content-Type': fileType
-      }
-    })
-    
-    if (!uploadResponse.ok) {
-      console.error('이미지 업로드 실패:', await uploadResponse.text())
-      return
+  // 파일 내용 읽기
+  const fileContent = fs.readFileSync(imagePath)
+
+  // 파일 업로드
+  const uploadResponse = await fetch(uploadUrl, {
+    method: 'PUT',
+    body: fileContent,
+    headers: {
+      'Content-Type': fileType
     }
-    console.log('이미지 업로드 성공!')
-    const imageKey = key // 나중에 Image 레코드에 저장
+  })
+
+  if (!uploadResponse.ok) {
+    console.error('이미지 업로드 실패:', await uploadResponse.text())
+    return
+  }
+  console.log('이미지 업로드 성공!')
+  const imageKey = key // 나중에 Image 레코드에 저장
 
   // 3. DB 업로드: 상품 레코드 생성 후 벡터·이미지 저장
   console.log('script 실행됨')
@@ -107,7 +107,7 @@ async function main() {
   }
 
   // 임베딩 숫자 배열을 PostgreSQL pgvector 타입 문자열로 변환
-  const postEmbbeding = pgvector.toSql(embeddings)
+  const postEmbedding = pgvector.toSql(embeddings)
 
   // Product 테이블에서 해당 id의 vector 컬럼만 업데이트하는 SQL
   const queryText = `
@@ -117,7 +117,7 @@ async function main() {
   `
 
   // $1 = vector 문자열, $2 = productId
-  const values = [postEmbbeding, productId]
+  const values = [postEmbedding, productId]
 
   try {
     await pool.query(queryText, values)

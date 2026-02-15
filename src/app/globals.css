@@ -119,6 +119,8 @@
     @apply border-border outline-ring/50;
   }
   body {
+    /* 한글 글리프가 없는 폰트가 선택돼도 한국어가 깨지지 않도록 폴백 체인을 고정합니다. */
+    font-family: var(--font-inter), "Apple SD Gothic Neo", "Malgun Gothic", "맑은 고딕", "Noto Sans KR", sans-serif;
     @apply bg-background text-foreground;
   }
 }

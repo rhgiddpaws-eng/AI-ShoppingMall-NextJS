@@ -1,13 +1,15 @@
 // =============================================================================
-// 관리자 주문 상세 API - GET/PUT /api/admin/orders/[id]
-// GET: 주문 상세(Prisma). PUT: deliveryStatus, shippingAddress 등 업데이트
+// 관리자 주문 상세 API - /api/admin/orders/[id]
+// GET: 주문 상세 조회(택배 필드 포함)
+// PUT: 배송 상태/송장/공급자/라이더 좌표 수동 갱신
 // =============================================================================
 
 import { NextResponse } from "next/server"
-import { requireAdminSession } from "@/lib/requireAdminSession"
+import type { DeliveryProvider, DeliveryStatus } from "@prisma/client"
 import prismaClient from "@/lib/prismaClient"
+import { requireAdminSession } from "@/lib/requireAdminSession"
 import { getCdnUrl } from "@/lib/cdn"
-import type { DeliveryStatus } from "@prisma/client"
+import { geocodeAddress } from "@/lib/naverGeocode"
 
 const DELIVERY_STATUS_VALUES: DeliveryStatus[] = [
   "ORDER_COMPLETE",
@@ -17,15 +19,28 @@ const DELIVERY_STATUS_VALUES: DeliveryStatus[] = [
   "DELIVERED",
 ]
 
+const DELIVERY_PROVIDER_VALUES: DeliveryProvider[] = [
+  "MOCK",
+  "KAKAO",
+  "BAROGO",
+  "VROONG",
+  "THINKING",
+  "INTERNAL",
+]
+
+const isValidLatitude = (value: number) => Number.isFinite(value) && value >= -90 && value <= 90
+const isValidLongitude = (value: number) => Number.isFinite(value) && value >= -180 && value <= 180
+
 export async function GET(
   request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   const auth = await requireAdminSession(request)
   if ("error" in auth) return auth.error
+
   const id = Number((await params).id)
   if (!Number.isInteger(id)) {
-    return NextResponse.json({ error: "유효하지 않은 주문 ID" }, { status: 400 })
+    return NextResponse.json({ error: "유효하지 않은 주문 ID입니다." }, { status: 400 })
   }
 
   const order = await prismaClient.order.findUnique({
@@ -47,14 +62,14 @@ export async function GET(
       payment: true,
     },
   })
+
   if (!order) {
-    return NextResponse.json({ error: "주문을 찾을 수 없습니다" }, { status: 404 })
+    return NextResponse.json({ error: "주문을 찾을 수 없습니다." }, { status: 404 })
   }
 
-  type OrderItemWithProduct = (typeof order)["items"][number]
   const formatted = {
     ...order,
-    items: order.items.map((item: OrderItemWithProduct) => ({
+    items: order.items.map((item) => ({
       ...item,
       product: {
         ...item.product,
@@ -67,50 +82,171 @@ export async function GET(
 
 export async function PUT(
   request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   const auth = await requireAdminSession(request)
   if ("error" in auth) return auth.error
+
   const id = Number((await params).id)
   if (!Number.isInteger(id)) {
-    return NextResponse.json({ error: "유효하지 않은 주문 ID" }, { status: 400 })
+    return NextResponse.json({ error: "유효하지 않은 주문 ID입니다." }, { status: 400 })
   }
 
   try {
     const body = await request.json()
-    const { deliveryStatus, shippingAddress, shippingLat, shippingLng } = body as {
+    const {
+      deliveryStatus,
+      deliveryProvider,
+      shippingAddress,
+      shippingLat,
+      shippingLng,
+      riderLat,
+      riderLng,
+      courierCode,
+      trackingNumber,
+      trackingUrl,
+      externalDeliveryId,
+      externalDeliveryStatus,
+    } = body as {
       deliveryStatus?: string
+      deliveryProvider?: string | null
       shippingAddress?: string
-      shippingLat?: number
-      shippingLng?: number
+      shippingLat?: number | null
+      shippingLng?: number | null
+      riderLat?: number | null
+      riderLng?: number | null
+      courierCode?: string | null
+      trackingNumber?: string | null
+      trackingUrl?: string | null
+      externalDeliveryId?: string | null
+      externalDeliveryStatus?: string | null
     }
 
     const updateData: {
       deliveryStatus?: DeliveryStatus
+      deliveryProvider?: DeliveryProvider | null
       shippingAddress?: string
-      shippingLat?: number
-      shippingLng?: number
+      shippingLat?: number | null
+      shippingLng?: number | null
+      riderLat?: number | null
+      riderLng?: number | null
+      riderUpdatedAt?: Date | null
+      courierCode?: string | null
+      trackingNumber?: string | null
+      trackingUrl?: string | null
+      externalDeliveryId?: string | null
+      externalDeliveryStatus?: string | null
+      deliveredAt?: Date | null
     } = {}
+
     if (deliveryStatus && DELIVERY_STATUS_VALUES.includes(deliveryStatus as DeliveryStatus)) {
       updateData.deliveryStatus = deliveryStatus as DeliveryStatus
+      updateData.deliveredAt = deliveryStatus === "DELIVERED" ? new Date() : null
     }
-    if (shippingAddress !== undefined) updateData.shippingAddress = shippingAddress
-    if (shippingLat !== undefined) updateData.shippingLat = shippingLat
-    if (shippingLng !== undefined) updateData.shippingLng = shippingLng
+
+    if (deliveryProvider !== undefined) {
+      if (deliveryProvider === null || deliveryProvider === "") {
+        updateData.deliveryProvider = null
+      } else if (DELIVERY_PROVIDER_VALUES.includes(deliveryProvider as DeliveryProvider)) {
+        updateData.deliveryProvider = deliveryProvider as DeliveryProvider
+      } else {
+        return NextResponse.json({ error: "deliveryProvider 값이 올바르지 않습니다." }, { status: 400 })
+      }
+    }
+
+    if (shippingAddress !== undefined) {
+      const normalizedAddress = shippingAddress.trim()
+      updateData.shippingAddress = normalizedAddress
+    }
+
+    // 배송지 좌표는 위/경도를 항상 쌍으로 받아 지도 표시 오류를 줄입니다.
+    const hasShippingLatInput = shippingLat !== undefined
+    const hasShippingLngInput = shippingLng !== undefined
+    if (hasShippingLatInput !== hasShippingLngInput) {
+      return NextResponse.json({ error: "shippingLat/shippingLng는 함께 전달해야 합니다." }, { status: 400 })
+    }
+    if (hasShippingLatInput && hasShippingLngInput) {
+      if (shippingLat !== null && !isValidLatitude(shippingLat)) {
+        return NextResponse.json({ error: "shippingLat는 -90~90 범위의 숫자여야 합니다." }, { status: 400 })
+      }
+      if (shippingLng !== null && !isValidLongitude(shippingLng)) {
+        return NextResponse.json({ error: "shippingLng는 -180~180 범위의 숫자여야 합니다." }, { status: 400 })
+      }
+      updateData.shippingLat = shippingLat
+      updateData.shippingLng = shippingLng
+    }
+
+    // 주소만 수정된 경우에는 좌표를 자동 보정해 지도 연동이 끊기지 않게 합니다.
+    if (shippingAddress !== undefined && !hasShippingLatInput && !hasShippingLngInput) {
+      const normalizedAddress = shippingAddress.trim()
+      if (!normalizedAddress) {
+        updateData.shippingLat = null
+        updateData.shippingLng = null
+      } else {
+        const geocoded = await geocodeAddress(normalizedAddress)
+        if (geocoded) {
+          updateData.shippingLat = geocoded.lat
+          updateData.shippingLng = geocoded.lng
+        }
+      }
+    }
+
+    // 라이더 좌표도 동일하게 쌍 검증과 범위 검증을 적용합니다.
+    const hasRiderLatInput = riderLat !== undefined
+    const hasRiderLngInput = riderLng !== undefined
+    if (hasRiderLatInput !== hasRiderLngInput) {
+      return NextResponse.json({ error: "riderLat/riderLng는 함께 전달해야 합니다." }, { status: 400 })
+    }
+    if (hasRiderLatInput && hasRiderLngInput) {
+      if (riderLat !== null && !isValidLatitude(riderLat)) {
+        return NextResponse.json({ error: "riderLat는 -90~90 범위의 숫자여야 합니다." }, { status: 400 })
+      }
+      if (riderLng !== null && !isValidLongitude(riderLng)) {
+        return NextResponse.json({ error: "riderLng는 -180~180 범위의 숫자여야 합니다." }, { status: 400 })
+      }
+      updateData.riderLat = riderLat
+      updateData.riderLng = riderLng
+    }
+
+    if (hasRiderLatInput && hasRiderLngInput) {
+      const shouldClear = riderLat === null || riderLng === null
+      updateData.riderUpdatedAt = shouldClear ? null : new Date()
+    }
+
+    if (courierCode !== undefined) updateData.courierCode = courierCode
+    if (trackingNumber !== undefined) updateData.trackingNumber = trackingNumber
+    if (trackingUrl !== undefined) updateData.trackingUrl = trackingUrl
+    if (externalDeliveryId !== undefined) updateData.externalDeliveryId = externalDeliveryId
+    if (externalDeliveryStatus !== undefined) updateData.externalDeliveryStatus = externalDeliveryStatus
 
     const order = await prismaClient.order.update({
       where: { id },
       data: updateData,
       include: {
         user: { select: { id: true, email: true, name: true } },
-        items: { include: { product: { select: { id: true, name: true, price: true } } } },
+        items: {
+          include: {
+            product: { select: { id: true, name: true, price: true, images: { select: { thumbnail: true }, take: 1 } } },
+          },
+        },
         payment: true,
       },
     })
-    return NextResponse.json(order)
+
+    const formatted = {
+      ...order,
+      items: order.items.map((item) => ({
+        ...item,
+        product: {
+          ...item.product,
+          imageSrc: getCdnUrl(item.product.images?.[0]?.thumbnail) || "/placeholder.svg",
+        },
+      })),
+    }
+
+    return NextResponse.json(formatted)
   } catch (error) {
-    console.error("주문 상태 업데이트 실패:", error)
-    return NextResponse.json({ error: "주문 상태 업데이트 실패" }, { status: 400 })
+    console.error("관리자 주문 업데이트 실패:", error)
+    return NextResponse.json({ error: "주문 업데이트에 실패했습니다." }, { status: 400 })
   }
 }
-

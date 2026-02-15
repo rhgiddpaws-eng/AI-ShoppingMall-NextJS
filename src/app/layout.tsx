@@ -12,7 +12,8 @@ import { Toaster } from '@/components/ui/sonner'
 import { ShopProvider } from '@/lib/context/ShopContext'
 
 /** Google Inter 폰트 설정 (라틴 서브셋) */
-const inter = Inter({ subsets: ['latin'] })
+// 라틴 텍스트는 Inter를 사용하고, 한글은 전역 CSS 폴백 폰트로 안정적으로 표시합니다.
+const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
 
 /** SEO·메타데이터: 문서 제목, 설명, 생성기 정보 */
 export const metadata: Metadata = {
@@ -32,7 +33,8 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ko" suppressHydrationWarning>
-      <body className={inter.className}>
+      {/* 폰트 변수 클래스를 body에 넣어 전역 폴백 폰트 체인을 함께 적용합니다. */}
+      <body className={inter.variable}>
         {/* 테마 제공: 다크/라이트/시스템, 클래스 기반, 전환 애니메이션 비활성화 */}
         <ThemeProvider
           attribute="class"

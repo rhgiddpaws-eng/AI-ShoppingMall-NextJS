@@ -327,6 +327,12 @@
 
 
 ## 6.1 기타 중요사항
+- **DB 초기화**
+- S3 버킷 초기화
+- npx tsx scripts/cleanup_all_except_user.ts
+- npx tsx scripts/upload_many_products.ts
+- npx tsx scripts/generate_mock_orders.ts
+
 
 - **벡터값 넣기**
   - prisma client 가 제공하는 로우쿼리를 이용해야 백터값을 db에 업데이트 할수 있음

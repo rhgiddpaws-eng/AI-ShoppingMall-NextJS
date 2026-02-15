@@ -19,6 +19,7 @@ import { useAuthStore } from '@/lib/store'
 import { toast } from 'sonner'
 import { OrderHistory } from '@/components/order-history'
 import { InquiryHistory } from '@/components/inquiry-history'
+import { CompletedDeliveryList } from '@/components/completed-delivery-list'
 
 /** 마이페이지: 프로필 수정, 주문 내역, 결제 정보, 설정 탭 + 로그아웃 */
 export default function AccountPage() {
@@ -108,6 +109,7 @@ export default function AccountPage() {
         <TabsContent value="orders" className="mt-6">
           <h2 className="text-xl font-semibold mb-4">주문 내역</h2>
           <OrderHistory />
+          <CompletedDeliveryList />
         </TabsContent>
         {/* 문의 내역 탭 */}
         <TabsContent value="inquiries" className="mt-6">

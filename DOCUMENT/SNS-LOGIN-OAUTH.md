@@ -22,11 +22,11 @@
 
 | 변수명 | 설명 | 필수 |
 |--------|------|------|
-| `KAKAO_CLIENT_ID` | Kakao Developers REST API 키 | ✅ |
+| `KAKAO_REST_API_KEY` | Kakao Developers REST API 키 | ✅ |
 | `KAKAO_CLIENT_SECRET` | 카카오 개발자 사이트에서 발급한 Client Secret (선택, 보안 강화 시 권장) | ❌ |
 
 - [Kakao Developers](https://developers.kakao.com/) → 앱 생성 → 카카오 로그인 활성화 → Redirect URI: `https://your-domain.com/api/auth/kakao/callback`.
-- 동의 항목에서 **이메일**, **프로필(닉네임)** 필요 시 활성화.
+- 동의 항목에서 **프로필(닉네임)**은 활성화하고, **이메일(account_email)**은 필요할 때만 활성화.
 
 ## API 경로
 

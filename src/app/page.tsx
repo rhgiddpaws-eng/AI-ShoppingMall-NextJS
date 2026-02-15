@@ -11,6 +11,8 @@ import { FeaturedProducts } from '@/components/featured-products'
 import { HeroSection } from '@/components/hero-section'
 import { NavBar } from '@/components/NavBar'
 import { NewProducts } from '@/components/new-products'
+import { HomeDeliveryMapSection } from '@/components/home-delivery-map-section'
+import { CategoryCard } from '@/components/category-card'
 
 /**
  * 홈 페이지: 히어로(GIF/동영상/이미지 + 애니메이션), 카테고리, 인기/신상품
@@ -21,97 +23,63 @@ export default function Home() {
   const heroGifSrc = typeof process.env.NEXT_PUBLIC_HERO_GIF_URL === "string"
     ? process.env.NEXT_PUBLIC_HERO_GIF_URL
     : undefined
-  const heroVideoSrc = typeof process.env.NEXT_PUBLIC_HERO_VIDEO_URL === "string"
-    ? process.env.NEXT_PUBLIC_HERO_VIDEO_URL
-    : undefined
+  // 사용자가 요청한 로컬 비디오 파일 경로 사용
+  const heroVideoSrc = "/main/1.mp4"
 
   return (
     <div className="flex flex-col min-h-screen">
       <NavBar />
 
-      <main className="flex-1">
+      <main className="flex-1 bg-gradient-to-b from-background via-background to-muted/20">
         <HeroSection gifSrc={heroGifSrc} videoSrc={heroVideoSrc} />
 
         {/* Categories: 남성/여성/액세서리/신발 카테고리 그리드 링크 */}
         <section className="py-12 container mx-auto px-4">
-          <h2 className="text-2xl font-bold mb-6">카테고리</h2>
+          <div className="mb-6">
+            <p className="text-xs font-semibold tracking-[0.16em] uppercase text-muted-foreground">Shop By Edit</p>
+            <h2 className="text-2xl md:text-3xl font-bold mt-1">카테고리</h2>
+          </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Link
+            <CategoryCard
               href="/category/men"
-              className="group relative h-[180px] rounded-lg overflow-hidden"
-            >
-              <Image
-                src="/category/men.webp"
-                alt="남성"
-                fill
-                sizes="(max-width: 768px) 50vw, 25vw"
-                className="object-cover group-hover:scale-105 transition-transform duration-300"
-              />
-              <div className="absolute inset-0 bg-black/40 group-hover:bg-black/50 transition-colors flex items-center justify-center">
-                <span className="text-white text-xl font-semibold">남성</span>
-              </div>
-            </Link>
-            <Link
+              label="남성"
+              images={["/category/men.png", "/category/men2.png"]}
+            />
+            <CategoryCard
               href="/category/women"
-              className="group relative h-[180px] rounded-lg overflow-hidden"
-            >
-              <Image
-                src="/category/women.webp"
-                alt="여성"
-                fill
-                sizes="(max-width: 768px) 50vw, 25vw"
-                className="object-cover group-hover:scale-105 transition-transform duration-300"
-              />
-              <div className="absolute inset-0 bg-black/40 group-hover:bg-black/50 transition-colors flex items-center justify-center">
-                <span className="text-white text-xl font-semibold">여성</span>
-              </div>
-            </Link>
-            <Link
+              label="여성"
+              images={["/category/women.png", "/category/women2.png"]}
+            />
+            <CategoryCard
               href="/category/accessories"
-              className="group relative h-[180px] rounded-lg overflow-hidden"
-            >
-              <Image
-                src="/category/accessories.webp"
-                alt="액세서리"
-                fill
-                sizes="(max-width: 768px) 50vw, 25vw"
-                className="object-cover group-hover:scale-105 transition-transform duration-300"
-              />
-              <div className="absolute inset-0 bg-black/40 group-hover:bg-black/50 transition-colors flex items-center justify-center">
-                <span className="text-white text-xl font-semibold">
-                  액세서리
-                </span>
-              </div>
-            </Link>
-            <Link
+              label="액세서리"
+              images={["/category/accessories.png", "/category/accessories2.png"]}
+            />
+            <CategoryCard
               href="/category/shoes"
-              className="group relative h-[180px] rounded-lg overflow-hidden"
-            >
-              <Image
-                src="/category/shoes.webp"
-                alt="신발"
-                fill
-                sizes="(max-width: 768px) 50vw, 25vw"
-                className="object-cover group-hover:scale-105 transition-transform duration-300"
-              />
-              <div className="absolute inset-0 bg-black/40 group-hover:bg-black/50 transition-colors flex items-center justify-center">
-                <span className="text-white text-xl font-semibold">신발</span>
-              </div>
-            </Link>
+              label="신발"
+              images={["/category/shoes.png", "/category/shoes2.png"]}
+            />
           </div>
         </section>
 
         {/* Featured Products: 인기 상품 섹션 (배경 muted) */}
-        <section className="py-12 bg-muted">
+        <section className="py-12 bg-gradient-to-r from-muted/50 via-muted to-muted/40 border-y">
           <div className="container mx-auto px-4">
-            <h2 className="text-2xl font-bold mb-6">인기 상품</h2>
+            <div className="mb-6">
+              <p className="text-xs font-semibold tracking-[0.16em] uppercase text-muted-foreground">Best Picks</p>
+              <h2 className="text-2xl md:text-3xl font-bold mt-1">인기 상품</h2>
+            </div>
             <FeaturedProducts />
           </div>
         </section>
 
         {/* New Arrivals: 신상품 목록 + "더 보기" 버튼 */}
         <section className="py-12 container mx-auto px-4">
-          <h2 className="text-2xl font-bold mb-6">신상품</h2>
+          <div className="mb-6">
+            <p className="text-xs font-semibold tracking-[0.16em] uppercase text-muted-foreground">Latest Drop</p>
+            <h2 className="text-2xl md:text-3xl font-bold mt-1">신상품</h2>
+          </div>
           <NewProducts />
           <div className="mt-8 text-center">
             <Button size="lg" variant="outline" asChild>
@@ -121,7 +89,11 @@ export default function Home() {
         </section>
 
         {/* Promotion Banner: 신규 회원 10% 할인 CTA */}
-        <section className="py-12 bg-primary text-primary-foreground">
+        <section className="py-12 bg-primary text-primary-foreground relative overflow-hidden">
+          <div className="absolute inset-0 pointer-events-none">
+            <div className="absolute -left-16 -top-16 h-56 w-56 rounded-full bg-white/10 blur-2xl" />
+            <div className="absolute -right-16 -bottom-16 h-64 w-64 rounded-full bg-white/10 blur-2xl" />
+          </div>
           <div className="container mx-auto px-4 text-center">
             <h2 className="text-2xl md:text-3xl font-bold mb-4">
               신규 회원 가입 시 10% 할인
@@ -134,6 +106,8 @@ export default function Home() {
             </Button>
           </div>
         </section>
+
+        <HomeDeliveryMapSection />
       </main>
 
       {/* 푸터: 4열 링크 그룹(고객서비스/쇼핑/회사/법적고지) + 저작권 */}

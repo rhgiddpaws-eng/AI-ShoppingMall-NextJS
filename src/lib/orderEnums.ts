@@ -27,6 +27,16 @@ export const DeliveryStatus = {
 } as const
 export type DeliveryStatus = (typeof DeliveryStatus)[keyof typeof DeliveryStatus]
 
+export const DeliveryProvider = {
+  MOCK: 'MOCK',
+  KAKAO: 'KAKAO',
+  BAROGO: 'BAROGO',
+  VROONG: 'VROONG',
+  THINKING: 'THINKING',
+  INTERNAL: 'INTERNAL',
+} as const
+export type DeliveryProvider = (typeof DeliveryProvider)[keyof typeof DeliveryProvider]
+
 export const Category = {
   MEN: 'MEN',
   WOMEN: 'WOMEN',

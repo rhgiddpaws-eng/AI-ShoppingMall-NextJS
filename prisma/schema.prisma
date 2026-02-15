@@ -1,8 +1,6 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
 generator client {
   provider        = "prisma-client-js"
   output          = "../node_modules/.prisma/client"
@@ -17,31 +15,31 @@ datasource db {
 }
 
 model User {
-  id                   Int       @id @default(autoincrement())
-  email                String    @unique
-  password             String?   // 소셜 로그인인 경우 null 가능
-  name                 String?
-  resetToken           String?   // 비밀번호 재설정 토큰
-  resetTokenExpiresAt  DateTime? // 토큰 만료 시각
-  createdAt            DateTime  @default(now())
-  updatedAt            DateTime  @updatedAt
-  role                 UserRole  @default(BUYER)
+  id                  Int      @id @default(autoincrement())
+  email               String   @unique
+  password            String?
+  name                String?
+  resetToken          String?
+  resetTokenExpiresAt DateTime?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  role                UserRole @default(BUYER)
 
-  // 관계
-  orders    Order[]
-  addresses Address[]
-  cart      Cart?
-  wishlist  Wishlist?
-  inquiries Inquiry[]
+  orders            Order[]
+  addresses         Address[]
+  cart              Cart?
+  wishlist          Wishlist?
+  inquiries         Inquiry[]
+  riderLocationLogs RiderLocationLog[]
 }
 
 model Address {
   id         Int      @id @default(autoincrement())
   userId     Int
   user       User     @relation(fields: [userId], references: [id])
-  address    String // 메인주소
-  extra      String? // 추가주소
-  postalCode String // 우편번호
+  address    String
+  extra      String?
+  postalCode String
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 }
@@ -60,25 +58,22 @@ model Product {
   discountRate Float                  @default(0)
   category     Category?
   status       ProductStatus          @default(PUBLISHED)
-  // pgvector 확장을 사용한 벡터 임베딩 데이터 저장 (Prisma에서 직접 지원하지 않는 경우 Unsupported 사용)
   vector       Unsupported("vector")?
   createdAt    DateTime               @default(now())
   updatedAt    DateTime               @updatedAt
 
-  // 관계
   orderItems    OrderItem[]
   images        Image[]
   cartItems     CartItem[]
   wishlistItems WishlistEntry[]
 }
 
-// 로그인 사용자 장바구니 (서버 관리). /api/user/cart 에서 사용
 model Cart {
-  id        Int        @id @default(autoincrement())
-  userId    Int        @unique
-  user      User       @relation(fields: [userId], references: [id])
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
+  id        Int      @id @default(autoincrement())
+  userId    Int      @unique
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   items CartItem[]
 }
@@ -96,13 +91,12 @@ model CartItem {
   @@unique([cartId, productId])
 }
 
-// 로그인 사용자 위시리스트 (서버 관리). /api/user/wishlist 에서 사용
 model Wishlist {
-  id        Int             @id @default(autoincrement())
-  userId    Int             @unique
-  user      User            @relation(fields: [userId], references: [id])
-  createdAt DateTime        @default(now())
-  updatedAt DateTime        @updatedAt
+  id        Int      @id @default(autoincrement())
+  userId    Int      @unique
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   items WishlistEntry[]
 }
@@ -130,46 +124,104 @@ model Image {
 }
 
 enum DeliveryStatus {
-  ORDER_COMPLETE  // 주문완료
-  PREPARING       // 배송준비
-  IN_DELIVERY     // 배달중
-  ARRIVING        // 도착중
-  DELIVERED       // 배달완료
+  ORDER_COMPLETE
+  PREPARING
+  IN_DELIVERY
+  ARRIVING
+  DELIVERED
+}
+
+enum DeliveryProvider {
+  MOCK
+  KAKAO
+  BAROGO
+  VROONG
+  THINKING
+  INTERNAL
 }
 
 model Order {
-  id              Int             @id @default(autoincrement())
-  user            User            @relation(fields: [userId], references: [id])
-  userId          Int
-  totalAmount     Float
-  status          OrderStatus
-  deliveryStatus  DeliveryStatus? @default(ORDER_COMPLETE) // 배달 추적
-  shippingAddress String?         // 배송지 주소 (지도/배달용)
-  shippingLat     Float?          // 배송지 위도 (네이버 지도)
-  shippingLng     Float?          // 배송지 경도
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
+  id                     Int               @id @default(autoincrement())
+  user                   User              @relation(fields: [userId], references: [id])
+  userId                 Int
+  totalAmount            Float
+  status                 OrderStatus
+  deliveryStatus         DeliveryStatus?   @default(ORDER_COMPLETE)
+  deliveryProvider       DeliveryProvider?
+  externalDeliveryId     String?
+  externalDeliveryStatus String?
+  courierCode            String?
+  trackingNumber         String?
+  trackingUrl            String?
+  dispatchedAt           DateTime?
+  deliveredAt            DateTime?
+  shippingAddress        String?
+  shippingLat            Float?
+  shippingLng            Float?
+  riderLat               Float?
+  riderLng               Float?
+  riderUpdatedAt         DateTime?
+  createdAt              DateTime          @default(now())
+  updatedAt              DateTime          @updatedAt
 
-  // 관계
-  items     OrderItem[]
-  payment   Payment? // 1:1 관계, 결제 정보는 주문이 생성된 후 연결
-  inquiries Inquiry[]
+  items             OrderItem[]
+  payment           Payment?
+  inquiries         Inquiry[]
+  deliveryEvents    DeliveryEvent[]
+  riderLocationLogs RiderLocationLog[]
+
+  @@index([status, deliveryStatus])
+  @@index([externalDeliveryId])
+  @@index([trackingNumber])
+  @@index([deliveryProvider, externalDeliveryStatus])
 }
 
-// 문의하기 (주문 관련 문의, 이미지/동영상 첨부 S3 키 저장)
 model Inquiry {
-  id             Int       @id @default(autoincrement())
+  id             Int      @id @default(autoincrement())
   userId         Int
-  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  orderId        Int?      // 주문 연동 시 사용
-  order          Order?    @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orderId        Int?
+  order          Order?   @relation(fields: [orderId], references: [id], onDelete: SetNull)
   message        String
-  attachmentKeys String[]  @default([]) // S3 키 목록 (inquiries/{userId}/...)
-  replyMessage   String?   // 관리자 답변
+  attachmentKeys String[] @default([])
+  replyMessage   String?
   repliedAt      DateTime?
-  repliedBy      Int?      // 답변한 관리자 userId
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  repliedBy      Int?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model DeliveryEvent {
+  id         Int      @id @default(autoincrement())
+  orderId    Int
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  provider   String
+  eventType  String
+  payload    Json
+  occurredAt DateTime?
+  receivedAt DateTime @default(now())
+  dedupeKey  String   @unique
+  createdAt  DateTime @default(now())
+
+  @@index([orderId, receivedAt])
+  @@index([provider, eventType])
+}
+
+model RiderLocationLog {
+  id         Int      @id @default(autoincrement())
+  orderId    Int
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  riderUserId Int?
+  riderUser  User?    @relation(fields: [riderUserId], references: [id], onDelete: SetNull)
+  lat        Float
+  lng        Float
+  accuracy   Float?
+  source     String
+  recordedAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  @@index([orderId, recordedAt])
+  @@index([riderUserId, recordedAt])
 }
 
 model OrderItem {
@@ -179,7 +231,7 @@ model OrderItem {
   product   Product  @relation(fields: [productId], references: [id])
   productId Int
   quantity  Int
-  price     Float // 주문 시점의 상품 가격 (변동 가격 고려)
+  price     Float
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -190,8 +242,8 @@ model Payment {
   orderId        Int           @unique
   paymentMethod  String
   amount         Float
-  transactionId  String // 외부 결제사 거래 ID
-  paymentOrderId String // 외부 결제사 주문 ID
+  transactionId  String
+  paymentOrderId String
   status         PaymentStatus
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt

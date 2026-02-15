@@ -28,23 +28,30 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL(`${loginPath}?error=no_code`, request.url))
   }
 
-  const clientId = process.env.KAKAO_CLIENT_ID
+  // 카카오 OAuth client_id는 REST API 키 변수 하나만 사용한다.
+  const clientId = process.env.KAKAO_REST_API_KEY
   const clientSecret = process.env.KAKAO_CLIENT_SECRET ?? ''
   if (!clientId) {
     return NextResponse.redirect(new URL(`${loginPath}?error=config`, request.url))
   }
 
   const redirectUri = `${origin}/api/auth/kakao/callback`
+  // 카카오 Client Secret을 켠 환경에서만 client_secret을 보내고, 비활성 환경에서는 제외합니다.
+  // 이렇게 하면 Secret을 끈 앱에서 빈 문자열로 인한 토큰 교환 실패를 예방할 수 있습니다.
+  const tokenParams = new URLSearchParams({
+    code,
+    client_id: clientId,
+    redirect_uri: redirectUri,
+    grant_type: 'authorization_code',
+  })
+  if (clientSecret.trim()) {
+    tokenParams.set('client_secret', clientSecret)
+  }
+
   const tokenRes = await fetch(TOKEN_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      code,
-      client_id: clientId,
-      client_secret: clientSecret,
-      redirect_uri: redirectUri,
-      grant_type: 'authorization_code',
-    }),
+    body: tokenParams,
   })
 
   if (!tokenRes.ok) {

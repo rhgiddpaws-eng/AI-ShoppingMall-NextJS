@@ -6,10 +6,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 const KAKAO_AUTH_URL = 'https://kauth.kakao.com/oauth/authorize'
-const SCOPE = 'profile_nickname account_email'
+// KOE205 방지를 위해 이메일 동의 항목을 강제하지 않고 닉네임만 요청한다.
+// 이메일이 없을 때는 콜백에서 kakao_{id}@kakao.local 대체값을 사용한다.
+const SCOPE = 'profile_nickname'
 
 export async function GET(request: NextRequest) {
-  const clientId = process.env.KAKAO_CLIENT_ID
+  // 카카오 OAuth client_id는 REST API 키 변수 하나만 사용한다.
+  const clientId = process.env.KAKAO_REST_API_KEY
   if (!clientId) {
     return NextResponse.json({ error: 'Kakao OAuth not configured' }, { status: 503 })
   }
