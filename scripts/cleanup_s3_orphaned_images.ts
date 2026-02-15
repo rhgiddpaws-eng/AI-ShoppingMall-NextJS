@@ -22,12 +22,13 @@ async function getAllS3Keys(bucketName: string, prefix: string) {
     let continuationToken: string | undefined = undefined
 
     do {
-        const command = new ListObjectsV2Command({
+        // 타입 추론 충돌을 막기 위해 명시적으로 명령 타입을 고정한다.
+        const listCommand: ListObjectsV2Command = new ListObjectsV2Command({
             Bucket: bucketName,
             Prefix: prefix,
             ContinuationToken: continuationToken,
         })
-        const response = await s3Client.send(command)
+        const response = await s3Client.send(listCommand)
 
         if (response.Contents) {
             const fetchedKeys = response.Contents.map(obj => obj.Key).filter((k): k is string => !!k)

@@ -1,4 +1,4 @@
-// npx tsx scripts/update_products.ts
+﻿// npx tsx scripts/update_products.ts
 
 import { PrismaClient, Category } from '@prisma/client'
 import fs from 'fs'
@@ -143,6 +143,8 @@ async function main() {
 
         for (let i = 0; i < productsData.length; i++) {
             const product = productsData[i]
+            // 상품 단위로 예외를 분리해 한 상품 실패가 전체 중단으로 이어지지 않게 한다.
+            try {
 
             // 1. 기존 상품 찾기 (이름 기준)
             let existingProduct = await prisma.product.findFirst({
@@ -293,3 +295,4 @@ main()
         await prisma.$disconnect()
         process.exit(1)
     })
+
