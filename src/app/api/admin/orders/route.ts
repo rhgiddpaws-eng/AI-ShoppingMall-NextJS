@@ -5,6 +5,7 @@
 // =============================================================================
 
 import { NextResponse } from "next/server"
+import type { Prisma } from "@prisma/client"
 import prismaClient from "@/lib/prismaClient"
 import { requireAdminSession } from "@/lib/requireAdminSession"
 // 배포 환경에서 Prisma enum export 차이로 빌드가 깨지는 일을 막기 위해 로컬 enum 타입을 사용합니다.
@@ -21,8 +22,8 @@ const DELIVERY_STATUS_VALUES: DeliveryStatus[] = [
 export const dynamic = "force-dynamic"
 
 // Prisma 네임스페이스 import 없이도 order.findMany의 where 타입을 안전하게 재사용합니다.
-type OrderFindManyArgs = Parameters<typeof prismaClient.order.findMany>[0]
-type OrderWhereInput = NonNullable<NonNullable<OrderFindManyArgs>["where"]>
+// Prisma where 타입은 Prisma namespace에서 가져와, 배포 환경에서도 타입이 흔들리지 않게 합니다.
+type OrderWhereInput = Prisma.OrderWhereInput
 
 export async function GET(request: Request) {
   const auth = await requireAdminSession(request)
