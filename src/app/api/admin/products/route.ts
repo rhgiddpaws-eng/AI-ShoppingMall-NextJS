@@ -9,7 +9,6 @@ import { requireAdminSession } from "@/lib/requireAdminSession"
 import OpenAI from "openai"
 import pool from "@/lib/pgClient"
 import pgvector from "pgvector"
-import { Category, ProductStatus } from "@prisma/client"
 import type { PrismaTransactionClient } from "@/lib/prismaTransactionClient"
 
 const openai = new OpenAI({
@@ -140,7 +139,9 @@ export async function GET(request: Request) {
   }
 
   const list = await prismaClient.product.findMany({
-    where: where as { name?: { contains: string; mode: "insensitive" }; category?: Category; status?: ProductStatus },
+    // Vercel(배포) 환경에서는 Prisma enum/type export가 간헐적으로 흔들려 빌드가 실패할 수 있어
+    // where 조건은 plain object로 만들고 Prisma 호출 시점에만 캐스팅합니다.
+    where: where as any,
     orderBy: { id: "desc" },
   })
 
