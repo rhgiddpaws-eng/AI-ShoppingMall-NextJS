@@ -7,7 +7,7 @@ import { NextResponse } from "next/server"
 import prismaClient from "@/lib/prismaClient"
 import { getAuthFromRequest } from "@/lib/authFromRequest"
 import { getDeliveryProviderMode } from "@/lib/courier/providerRegistry"
-import type { Prisma } from "@prisma/client"
+import type { PrismaTransactionClient } from "@/lib/prismaTransactionClient"
 
 export async function POST(request: Request) {
   const auth = await getAuthFromRequest(request)
@@ -45,7 +45,8 @@ export async function POST(request: Request) {
   }
 
   // 빌드 환경 차이로 tx 추론이 깨져도 any가 되지 않도록 타입을 명시한다.
-  await prismaClient.$transaction(async (tx: Prisma.TransactionClient) => {
+  // Prisma 네임스페이스 import 없이도 tx 타입을 고정해 빌드 환경 차이를 줄입니다.
+  await prismaClient.$transaction(async (tx: PrismaTransactionClient) => {
     await tx.order.update({
       where: { id: body.orderId },
       data: {

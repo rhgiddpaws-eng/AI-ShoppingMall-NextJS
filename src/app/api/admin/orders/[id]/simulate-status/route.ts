@@ -4,10 +4,11 @@
 // =============================================================================
 
 import { NextResponse } from "next/server"
-import type { DeliveryProvider, DeliveryStatus, Prisma } from "@prisma/client"
+import type { DeliveryProvider, DeliveryStatus } from "@prisma/client"
 import prismaClient from "@/lib/prismaClient"
 import { requireAdminSession } from "@/lib/requireAdminSession"
 import { geocodeAddress } from "@/lib/naverGeocode"
+import type { PrismaTransactionClient } from "@/lib/prismaTransactionClient"
 import {
   mapExternalStatusToDeliveryStatus,
   normalizeExternalStatus,
@@ -212,7 +213,8 @@ export async function POST(
   const dedupeKey = `SIMULATED-STATUS-${order.id}-${nextExternalStatus}-${now.getTime()}`
 
   // Vercel 빌드에서도 tx 파라미터 타입이 any로 추론되지 않게 명시한다.
-  const updatedOrder = await prismaClient.$transaction(async (tx: Prisma.TransactionClient) => {
+  // Vercel 빌드에서도 Prisma 네임스페이스 import 없이 tx 타입을 안정적으로 유지합니다.
+  const updatedOrder = await prismaClient.$transaction(async (tx: PrismaTransactionClient) => {
     await tx.deliveryEvent.create({
       data: {
         orderId: order.id,

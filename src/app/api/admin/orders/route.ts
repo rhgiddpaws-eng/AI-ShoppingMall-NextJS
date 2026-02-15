@@ -5,7 +5,7 @@
 // =============================================================================
 
 import { NextResponse } from "next/server"
-import type { DeliveryStatus, Prisma } from "@prisma/client"
+import type { DeliveryStatus } from "@prisma/client"
 import prismaClient from "@/lib/prismaClient"
 import { requireAdminSession } from "@/lib/requireAdminSession"
 
@@ -18,6 +18,10 @@ const DELIVERY_STATUS_VALUES: DeliveryStatus[] = [
 ]
 
 export const dynamic = "force-dynamic"
+
+// Prisma 네임스페이스 import 없이도 order.findMany의 where 타입을 안전하게 재사용합니다.
+type OrderFindManyArgs = Parameters<typeof prismaClient.order.findMany>[0]
+type OrderWhereInput = NonNullable<NonNullable<OrderFindManyArgs>["where"]>
 
 export async function GET(request: Request) {
   const auth = await requireAdminSession(request)
@@ -33,13 +37,13 @@ export async function GET(request: Request) {
   const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), 100) : 20
   const cursor = cursorRaw && Number.isFinite(Number(cursorRaw)) ? Number(cursorRaw) : null
 
-  const where: Prisma.OrderWhereInput = {}
+  const where: OrderWhereInput = {}
   if (deliveryStatus && DELIVERY_STATUS_VALUES.includes(deliveryStatus as DeliveryStatus)) {
     where.deliveryStatus = deliveryStatus as DeliveryStatus
   }
 
   if (search.length > 0) {
-    const searchConditions: Prisma.OrderWhereInput[] = [
+    const searchConditions: OrderWhereInput[] = [
       { user: { name: { contains: search, mode: "insensitive" } } },
       { user: { email: { contains: search, mode: "insensitive" } } },
       { trackingNumber: { contains: search, mode: "insensitive" } },

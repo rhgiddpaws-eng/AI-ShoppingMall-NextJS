@@ -4,11 +4,25 @@
 // =============================================================================
 
 import { NextResponse } from "next/server"
-import { Prisma } from "@prisma/client"
 import prismaClient from "@/lib/prismaClient"
 import { getDeliveryProviderByName } from "@/lib/courier/providerRegistry"
 import type { DeliveryProviderName } from "@/lib/courier/providerAdapter"
 import { mapExternalStatusToDeliveryStatus } from "@/lib/courier/statusMapper"
+import type { PrismaTransactionClient } from "@/lib/prismaTransactionClient"
+
+// Prisma 네임스페이스 import 없이도 JSON payload 타입을 안전하게 맞추기 위한 추출 타입입니다.
+type DeliveryEventCreateArgs = Parameters<typeof prismaClient.deliveryEvent.create>[0]
+type DeliveryEventPayload = DeliveryEventCreateArgs["data"]["payload"]
+
+function isUniqueDedupeError(error: unknown): boolean {
+  // Prisma 오류 클래스 import 없이 code 값만 확인해 중복 웹훅(P2002)을 안전하게 처리합니다.
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: string }).code === "P2002"
+  )
+}
 
 function parseProviderName(value: string): DeliveryProviderName | null {
   const normalized = value.trim().toUpperCase()
@@ -77,13 +91,14 @@ export async function POST(
 
   try {
     // Vercel 빌드에서도 tx 파라미터가 implicit any로 처리되지 않도록 타입을 고정한다.
-    await prismaClient.$transaction(async (tx: Prisma.TransactionClient) => {
+    // Prisma 네임스페이스 import 없이도 tx 타입을 고정해 빌드 환경 차이를 줄입니다.
+    await prismaClient.$transaction(async (tx: PrismaTransactionClient) => {
       await tx.deliveryEvent.create({
         data: {
           orderId: order.id,
           provider: event.provider,
           eventType: event.eventType,
-          payload: (event.rawPayload ?? {}) as Prisma.InputJsonValue,
+          payload: (event.rawPayload ?? {}) as DeliveryEventPayload,
           occurredAt: event.occurredAt ?? new Date(),
           dedupeKey: event.dedupeKey,
         },
@@ -139,7 +154,7 @@ export async function POST(
     return NextResponse.json({ ok: true })
   } catch (error) {
     // dedupeKey가 이미 있으면 중복 웹훅으로 판단하고 성공 처리합니다.
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+    if (isUniqueDedupeError(error)) {
       return NextResponse.json({ ok: true, duplicated: true })
     }
     console.error("배송 웹훅 처리 실패:", error)

@@ -10,7 +10,7 @@ import OpenAI from "openai"
 import pool from "@/lib/pgClient"
 import pgvector from "pgvector"
 import { Category, ProductStatus } from "@prisma/client"
-import type { Prisma } from "@prisma/client"
+import type { PrismaTransactionClient } from "@/lib/prismaTransactionClient"
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -176,7 +176,8 @@ export async function POST(request: Request) {
     const status = productData.isDraft === true ? "DRAFT" : "PUBLISHED"
 
     // 배포 빌드에서 tx가 any로 보이지 않도록 Prisma 트랜잭션 타입을 고정한다.
-    const result = await prismaClient.$transaction(async (tx: Prisma.TransactionClient) => {
+    // Prisma 네임스페이스 import 없이도 tx 타입을 고정해 빌드 환경 차이를 줄입니다.
+    const result = await prismaClient.$transaction(async (tx: PrismaTransactionClient) => {
       const product = await tx.product.create({
         data: {
           name: productData.name,

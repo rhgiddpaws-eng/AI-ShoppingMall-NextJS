@@ -9,7 +9,7 @@ import { requireAdminSession } from "@/lib/requireAdminSession"
 import { getDispatchProvider } from "@/lib/courier/providerRegistry"
 import { geocodeAddress } from "@/lib/naverGeocode"
 import { normalizeExternalStatus } from "@/lib/courier/statusMapper"
-import type { Prisma } from "@prisma/client"
+import type { PrismaTransactionClient } from "@/lib/prismaTransactionClient"
 
 type DispatchPayload = {
   courierCode?: string | null
@@ -178,8 +178,8 @@ export async function POST(
 
     const dedupeKey = `DISPATCH-${dispatchResult.provider}-${dispatchResult.externalDeliveryId}`
 
-    // Vercel 빌드에서 추론이 흔들려도 tx가 any가 되지 않도록 트랜잭션 타입을 명시한다.
-    const updatedOrder = await prismaClient.$transaction(async (tx: Prisma.TransactionClient) => {
+    // Vercel 빌드에서 @prisma/client Prisma 네임스페이스 의존 없이 tx 타입을 명확히 고정합니다.
+    const updatedOrder = await prismaClient.$transaction(async (tx: PrismaTransactionClient) => {
       // 같은 주문에 대해 배차 버튼을 다시 눌러도 실패하지 않도록 dedupeKey 기준으로 업서트합니다.
       await tx.deliveryEvent.upsert({
         where: { dedupeKey },
