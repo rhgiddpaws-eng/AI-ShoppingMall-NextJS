@@ -31,6 +31,14 @@ const DELIVERY_PROVIDER_VALUES: DeliveryProvider[] = [
 
 const isValidLatitude = (value: number) => Number.isFinite(value) && value >= -90 && value <= 90
 const isValidLongitude = (value: number) => Number.isFinite(value) && value >= -180 && value <= 180
+// Vercel 타입체크에서 map 콜백 파라미터가 any로 떨어지지 않도록 주문 아이템 최소 타입을 고정합니다.
+type OrderItemWithProductThumbnail = {
+  product: {
+    images?: Array<{ thumbnail: string | null }>
+    [key: string]: unknown
+  }
+  [key: string]: unknown
+}
 
 export async function GET(
   request: Request,
@@ -70,7 +78,7 @@ export async function GET(
 
   const formatted = {
     ...order,
-    items: order.items.map((item) => ({
+    items: order.items.map((item: OrderItemWithProductThumbnail) => ({
       ...item,
       product: {
         ...item.product,
@@ -236,7 +244,7 @@ export async function PUT(
 
     const formatted = {
       ...order,
-      items: order.items.map((item) => ({
+      items: order.items.map((item: OrderItemWithProductThumbnail) => ({
         ...item,
         product: {
           ...item.product,
