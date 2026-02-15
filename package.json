@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "pnpm exec next build",
+    "build": "pnpm exec prisma generate && pnpm exec next build",
     "start": "next start",
     "lint": "next lint",
     "pathgen": "npx pathgen --dir ./src/app --output ./src/lib/apiRoutes.ts",
@@ -23,6 +23,19 @@
     "set-admin-role": "npx dotenv-cli -e .env.host -- tsx scripts/set-admin-role.ts",
     "update-products": "npx dotenv-cli -e .env.host -- tsx scripts/update_products.ts",
     "upload-products": "npx dotenv-cli -e .env.host -- tsx scripts/upload_products.ts"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@prisma/client",
+      "@prisma/engines",
+      "@tensorflow/tfjs-node",
+      "argon2",
+      "core-js",
+      "esbuild",
+      "prisma",
+      "puppeteer",
+      "sharp"
+    ]
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

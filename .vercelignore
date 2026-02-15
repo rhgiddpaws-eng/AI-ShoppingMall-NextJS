@@ -1,0 +1,23 @@
+# Dependencies / builds
+node_modules
+.next
+
+# Local Vercel metadata (do not upload)
+.vercel
+
+# Env files (never upload secrets)
+.env
+.env.*
+
+# Docs / materials (not needed for deploy)
+DOCUMENT
+docs
+기타자료
+
+# Local tools / logs
+.playwright-mcp
+.codex-dev.log
+tsconfig.tsbuildinfo
+
+# Local infra
+docker-compose
