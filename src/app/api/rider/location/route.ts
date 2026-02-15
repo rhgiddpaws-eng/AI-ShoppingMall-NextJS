@@ -7,6 +7,7 @@ import { NextResponse } from "next/server"
 import prismaClient from "@/lib/prismaClient"
 import { getAuthFromRequest } from "@/lib/authFromRequest"
 import { getDeliveryProviderMode } from "@/lib/courier/providerRegistry"
+import type { Prisma } from "@prisma/client"
 
 export async function POST(request: Request) {
   const auth = await getAuthFromRequest(request)
@@ -43,7 +44,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "결제 완료 주문만 위치를 갱신할 수 있습니다." }, { status: 409 })
   }
 
-  await prismaClient.$transaction(async (tx) => {
+  // 빌드 환경 차이로 tx 추론이 깨져도 any가 되지 않도록 타입을 명시한다.
+  await prismaClient.$transaction(async (tx: Prisma.TransactionClient) => {
     await tx.order.update({
       where: { id: body.orderId },
       data: {

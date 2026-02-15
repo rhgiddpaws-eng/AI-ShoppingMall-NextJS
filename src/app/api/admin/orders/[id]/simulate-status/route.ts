@@ -4,7 +4,7 @@
 // =============================================================================
 
 import { NextResponse } from "next/server"
-import type { DeliveryProvider, DeliveryStatus } from "@prisma/client"
+import type { DeliveryProvider, DeliveryStatus, Prisma } from "@prisma/client"
 import prismaClient from "@/lib/prismaClient"
 import { requireAdminSession } from "@/lib/requireAdminSession"
 import { geocodeAddress } from "@/lib/naverGeocode"
@@ -211,7 +211,8 @@ export async function POST(
   // 클릭할 때마다 고유 키를 만들어, 시뮬레이션 이력을 누적 추적할 수 있게 합니다.
   const dedupeKey = `SIMULATED-STATUS-${order.id}-${nextExternalStatus}-${now.getTime()}`
 
-  const updatedOrder = await prismaClient.$transaction(async (tx) => {
+  // Vercel 빌드에서도 tx 파라미터 타입이 any로 추론되지 않게 명시한다.
+  const updatedOrder = await prismaClient.$transaction(async (tx: Prisma.TransactionClient) => {
     await tx.deliveryEvent.create({
       data: {
         orderId: order.id,

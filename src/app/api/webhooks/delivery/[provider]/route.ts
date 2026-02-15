@@ -76,7 +76,8 @@ export async function POST(
   }
 
   try {
-    await prismaClient.$transaction(async (tx) => {
+    // Vercel 빌드에서도 tx 파라미터가 implicit any로 처리되지 않도록 타입을 고정한다.
+    await prismaClient.$transaction(async (tx: Prisma.TransactionClient) => {
       await tx.deliveryEvent.create({
         data: {
           orderId: order.id,
