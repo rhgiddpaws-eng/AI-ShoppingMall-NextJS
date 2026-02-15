@@ -1,20 +1,27 @@
-// =============================================================================
-// 관리자 대시보드 API - GET /api/admin/dashboard
-// 쿼리: period(week|month|year) → 통계·매출 추이·주문 상태·최근 주문·재고 부족 상품 반환
+﻿// =============================================================================
+// 愿由ъ옄 ??쒕낫??API - GET /api/admin/dashboard
+// 荑쇰━: period(week|month|year) ???듦퀎쨌留ㅼ텧 異붿씠쨌二쇰Ц ?곹깭쨌理쒓렐 二쇰Ц쨌?ш퀬 遺議??곹뭹 諛섑솚
 // =============================================================================
 
 import { NextResponse } from "next/server"
 import { requireAdminSession } from "@/lib/requireAdminSession"
 import prisma from "@/lib/prismaClient"
 
+type SalesOrderAmountRow = { totalAmount: number }
+
+// 매출 합계 계산을 공통화해 reduce 콜백 파라미터 타입 오류를 방지한다.
+function sumTotalAmount(rows: SalesOrderAmountRow[]): number {
+  return rows.reduce((sum: number, row: SalesOrderAmountRow) => sum + row.totalAmount, 0)
+}
+
 /**
- * 일별 매출 데이터 생성 (최근 30일)
+ * ?쇰퀎 留ㅼ텧 ?곗씠???앹꽦 (理쒓렐 30??
  */
 async function getDailySalesData() {
   const now = new Date()
   const salesData = []
 
-  // 최근 30일 데이터 생성
+  // 理쒓렐 30???곗씠???앹꽦
   for (let i = 29; i >= 0; i--) {
     const targetDate = new Date(now)
     targetDate.setDate(now.getDate() - i)
@@ -35,12 +42,12 @@ async function getDailySalesData() {
       },
     })
 
-    const totalSales = orders.reduce((sum, order) => sum + order.totalAmount, 0)
+    const totalSales = sumTotalAmount(orders)
     const month = targetDate.getMonth() + 1
     const day = targetDate.getDate()
     salesData.push({
       name: `${month}/${day}`,
-      매출: Math.round(totalSales),
+      留ㅼ텧: Math.round(totalSales),
     })
   }
 
@@ -48,13 +55,13 @@ async function getDailySalesData() {
 }
 
 /**
- * 월별 매출 데이터 생성 (최근 12개월)
+ * ?붾퀎 留ㅼ텧 ?곗씠???앹꽦 (理쒓렐 12媛쒖썡)
  */
 async function getMonthlySalesData() {
   const now = new Date()
   const salesData = []
 
-  // 최근 12개월 데이터 생성 (현재 월부터 역순으로)
+  // 理쒓렐 12媛쒖썡 ?곗씠???앹꽦 (?꾩옱 ?붾?????닚?쇰줈)
   for (let i = 11; i >= 0; i--) {
     const targetDate = new Date(now.getFullYear(), now.getMonth() - i, 1)
     const year = targetDate.getFullYear()
@@ -76,10 +83,10 @@ async function getMonthlySalesData() {
       },
     })
 
-    const totalSales = orders.reduce((sum, order) => sum + order.totalAmount, 0)
+    const totalSales = sumTotalAmount(orders)
     salesData.push({
       name: `${year}.${String(month + 1).padStart(2, '0')}`,
-      매출: Math.round(totalSales),
+      留ㅼ텧: Math.round(totalSales),
     })
   }
 
@@ -87,7 +94,7 @@ async function getMonthlySalesData() {
 }
 
 /**
- * 연도별 매출 데이터 생성 (최근 5년)
+ * ?곕룄蹂?留ㅼ텧 ?곗씠???앹꽦 (理쒓렐 5??
  */
 async function getYearlySalesData() {
   const now = new Date()
@@ -112,10 +119,10 @@ async function getYearlySalesData() {
       },
     })
 
-    const totalSales = orders.reduce((sum, order) => sum + order.totalAmount, 0)
+    const totalSales = sumTotalAmount(orders)
     salesData.push({
-      name: `${year}년`,
-      매출: Math.round(totalSales),
+      name: `${year}`,
+      留ㅼ텧: Math.round(totalSales),
     })
   }
 
@@ -123,25 +130,25 @@ async function getYearlySalesData() {
 }
 
 /**
- * 대시보드 통계 데이터 생성
+ * ??쒕낫???듦퀎 ?곗씠???앹꽦
  */
 async function getDashboardData(period: "week" | "month" | "year") {
   const now = new Date()
   const currentYear = now.getFullYear()
   const currentMonth = now.getMonth()
 
-  // 이번 달 시작/끝
+  // ?대쾲 ???쒖옉/??
   const thisMonthStart = new Date(currentYear, currentMonth, 1, 0, 0, 0)
   const thisMonthEnd = new Date(currentYear, currentMonth + 1, 0, 23, 59, 59)
 
-  // 지난 달 시작/끝
+  // 吏?????쒖옉/??
   const lastMonthStart = new Date(currentYear, currentMonth - 1, 1, 0, 0, 0)
   const lastMonthEnd = new Date(currentYear, currentMonth, 0, 23, 59, 59)
 
-  // 총 사용자 수
+  // 珥??ъ슜????
   const totalUsers = await prisma.user.count()
 
-  // 이번 달 신규 가입자
+  // ?대쾲 ???좉퇋 媛?낆옄
   const newUsersThisMonth = await prisma.user.count({
     where: {
       createdAt: {
@@ -151,7 +158,7 @@ async function getDashboardData(period: "week" | "month" | "year") {
     },
   })
 
-  // 지난 달 신규 가입자
+  // 吏?????좉퇋 媛?낆옄
   const newUsersLastMonth = await prisma.user.count({
     where: {
       createdAt: {
@@ -161,7 +168,7 @@ async function getDashboardData(period: "week" | "month" | "year") {
     },
   })
 
-  // 이번 달 매출
+  // ?대쾲 ??留ㅼ텧
   const thisMonthOrders = await prisma.order.findMany({
     where: {
       status: "PAID",
@@ -174,9 +181,9 @@ async function getDashboardData(period: "week" | "month" | "year") {
       totalAmount: true,
     },
   })
-  const monthlyRevenue = thisMonthOrders.reduce((sum, order) => sum + order.totalAmount, 0)
+  const monthlyRevenue = sumTotalAmount(thisMonthOrders)
 
-  // 지난 달 매출
+  // 吏????留ㅼ텧
   const lastMonthOrders = await prisma.order.findMany({
     where: {
       status: "PAID",
@@ -189,12 +196,12 @@ async function getDashboardData(period: "week" | "month" | "year") {
       totalAmount: true,
     },
   })
-  const lastMonthRevenue = lastMonthOrders.reduce((sum, order) => sum + order.totalAmount, 0)
+  const lastMonthRevenue = sumTotalAmount(lastMonthOrders)
 
-  // 총 주문 건수
+  // 珥?二쇰Ц 嫄댁닔
   const totalOrders = await prisma.order.count()
 
-  // 이번 달 주문 건수
+  // ?대쾲 ??二쇰Ц 嫄댁닔
   const ordersThisMonth = await prisma.order.count({
     where: {
       createdAt: {
@@ -204,7 +211,7 @@ async function getDashboardData(period: "week" | "month" | "year") {
     },
   })
 
-  // 지난 달 주문 건수
+  // 吏????二쇰Ц 嫄댁닔
   const ordersLastMonth = await prisma.order.count({
     where: {
       createdAt: {
@@ -214,7 +221,7 @@ async function getDashboardData(period: "week" | "month" | "year") {
     },
   })
 
-  // 재고 부족 상품 (재고 5개 이하)
+  // ?ш퀬 遺議??곹뭹 (?ш퀬 5媛??댄븯)
   const lowStockProducts = await prisma.product.count({
     where: {
       stock: {
@@ -223,12 +230,12 @@ async function getDashboardData(period: "week" | "month" | "year") {
     },
   })
 
-  // 주문 상태별 건수
+  // 二쇰Ц ?곹깭蹂?嫄댁닔
   const pendingOrders = await prisma.order.count({ where: { status: "PENDING" } })
   const paidOrders = await prisma.order.count({ where: { status: "PAID" } })
   const canceledOrders = await prisma.order.count({ where: { status: "CANCELED" } })
 
-  // 배송 상태별 건수 (PAID 주문 중)
+  // 諛곗넚 ?곹깭蹂?嫄댁닔 (PAID 二쇰Ц 以?
   const preparingOrders = await prisma.order.count({
     where: { status: "PAID", deliveryStatus: "PREPARING" },
   })
@@ -239,7 +246,7 @@ async function getDashboardData(period: "week" | "month" | "year") {
     where: { status: "PAID", deliveryStatus: "DELIVERED" },
   })
 
-  // 최근 주문 5개
+  // 理쒓렐 二쇰Ц 5媛?
   const recentOrders = await prisma.order.findMany({
     take: 5,
     orderBy: {
@@ -255,7 +262,7 @@ async function getDashboardData(period: "week" | "month" | "year") {
     },
   })
 
-  // 재고 부족 상품 목록
+  // ?ш퀬 遺議??곹뭹 紐⑸줉
   const lowStockProductsList = await prisma.product.findMany({
     where: {
       stock: {
@@ -274,7 +281,7 @@ async function getDashboardData(period: "week" | "month" | "year") {
     },
   })
 
-  // 기간별 매출 데이터
+  // 湲곌컙蹂?留ㅼ텧 ?곗씠??
   let salesData
   if (period === "week") {
     salesData = await getDailySalesData()
@@ -284,7 +291,7 @@ async function getDashboardData(period: "week" | "month" | "year") {
     salesData = await getYearlySalesData()
   }
 
-  // 트렌드 계산
+  // ?몃젋??怨꾩궛
   const userTrend = newUsersLastMonth > 0
     ? Math.round(((newUsersThisMonth - newUsersLastMonth) / newUsersLastMonth) * 100)
     : 0
@@ -317,27 +324,28 @@ async function getDashboardData(period: "week" | "month" | "year") {
       shipping: inDeliveryOrders,
       delivered: deliveredOrders,
       refundRequests: canceledOrders,
-      exchangeRequests: 0, // 교환 요청은 별도 테이블이 필요하므로 0으로 설정
+      exchangeRequests: 0, // 援먰솚 ?붿껌? 蹂꾨룄 ?뚯씠釉붿씠 ?꾩슂?섎?濡?0?쇰줈 ?ㅼ젙
     },
     recentOrders: recentOrders.map((order) => ({
       id: `ORD-${order.id.toString().padStart(3, "0")}`,
       customer: order.user.name || order.user.email,
       date: order.createdAt.toISOString().split("T")[0],
+      // 관리자 대시보드에서 사용하는 주문 상태 라벨을 안전한 문자열로 고정한다.
       status:
         order.deliveryStatus === "DELIVERED"
-          ? "배송 완료"
+          ? "Delivered"
           : order.deliveryStatus === "IN_DELIVERY"
-            ? "배송 중"
+            ? "In delivery"
             : order.status === "PAID"
-              ? "결제 완료"
-              : "결제 대기",
+              ? "Paid"
+              : "Pending",
       amount: Math.round(order.totalAmount),
     })),
     lowStockProducts: lowStockProductsList.map((product) => ({
       id: `PRD-${product.id.toString().padStart(3, "0")}`,
       name: product.name,
       stock: product.stock,
-      category: product.category || "미분류",
+      category: product.category || "Uncategorized",
     })),
   }
 }
@@ -353,4 +361,5 @@ export async function GET(request: Request) {
   const dashboardData = await getDashboardData(validPeriod)
   return NextResponse.json(dashboardData)
 }
+
 
