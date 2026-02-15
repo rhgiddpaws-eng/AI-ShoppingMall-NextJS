@@ -44,6 +44,9 @@ next-env.d.ts
 # -----------------------------------------------------------------------------
 # 자료 폴더 (저장소에 올리지 않음)
 기타자료/
+docs/
+DOCUMENT/
+scripts/products/
 
 # Playwright MCP 로그
 .playwright-mcp/
