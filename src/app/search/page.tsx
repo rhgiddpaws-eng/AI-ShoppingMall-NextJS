@@ -4,7 +4,7 @@
 // 검색어 입력 후 홈(/?search=...)으로 이동, 카테고리 링크(남성/여성/액세서리/신발)
 // =============================================================================
 
-import { useState } from "react"
+import { FormEvent, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Search } from "lucide-react"
@@ -12,15 +12,16 @@ import { NavBar } from "@/components/NavBar"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 
-/** 검색: 폼 제출 시 /?search=쿼리로 이동, 카테고리 버튼으로 /category/xxx 이동 */
+/** 검색: 폼 제출 시 /category/new?term=쿼리로 이동, 카테고리 버튼으로 /category/xxx 이동 */
 export default function SearchPage() {
   const [query, setQuery] = useState("")
   const router = useRouter()
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: FormEvent) => {
     e.preventDefault()
     if (query.trim()) {
-      router.push(`/?search=${encodeURIComponent(query.trim())}`)
+      // 메인 검색 동선과 동일하게 category/new + term 파라미터로 통일합니다.
+      router.push(`/category/new?term=${encodeURIComponent(query.trim())}`)
     }
   }
 

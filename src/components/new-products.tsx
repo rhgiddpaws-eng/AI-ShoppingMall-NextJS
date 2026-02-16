@@ -11,7 +11,7 @@
  * [기능]
  * - 마운트 시 GET /api/products?limit=8 fetch
  * - API 응답을 ProductWithImages[] 로 받아 ProductCard에 id, name, price, imageSrc, isNew 전달
- * - 이미지 URL: getCdnUrl(product.images[0]?.original) (.env NEXT_PUBLIC_AWS_BUCKET_CDN 사용)
+ * - 이미지 URL: getCdnUrl(product.images[0]?.thumbnail || product.images[0]?.original) (.env NEXT_PUBLIC_AWS_BUCKET_CDN 사용)
  *
  * [문법]
  * - ProductWithImages: API route에서 re-export 하는 타입 사용
@@ -56,7 +56,8 @@ export function NewProducts() {
           id={product.id.toString()}
           name={product.name}
           price={product.price}
-          imageSrc={getCdnUrl(product.images[0]?.original)}
+          // 신상품 목록 카드도 썸네일을 우선 사용해 네트워크 사용량을 줄입니다.
+          imageSrc={getCdnUrl(product.images[0]?.thumbnail || product.images[0]?.original)}
           isNew={true}
         />
       ))}

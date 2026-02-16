@@ -1,84 +1,116 @@
 // =============================================================================
 // 메인 페이지 (홈)
-// 쇼핑몰 랜딩: 히어로 배너, 카테고리, 인기/신상품, 프로모션, 푸터
+// 히어로, 카테고리, 추천/신상품, 프로모션, 배송 지도, 푸터를 구성합니다.
 // =============================================================================
 
-import Link from 'next/link'
-import Image from 'next/image'
+import Link from "next/link"
 
-import { Button } from '@/components/ui/button'
-import { FeaturedProducts } from '@/components/featured-products'
-import { HeroSection } from '@/components/hero-section'
-import { NavBar } from '@/components/NavBar'
-import { NewProducts } from '@/components/new-products'
-import { HomeDeliveryMapSection } from '@/components/home-delivery-map-section'
-import { CategoryCard } from '@/components/category-card'
+import { ApiWarmupPrimer } from "@/components/api-warmup-primer"
+import { CategoryCard } from "@/components/category-card"
+import { FeaturedProducts } from "@/components/featured-products"
+import { HeroSection } from "@/components/hero-section"
+import { HomeDeliveryMapSection } from "@/components/home-delivery-map-section"
+import { NavBar } from "@/components/NavBar"
+import { NewProducts } from "@/components/new-products"
+import { Button } from "@/components/ui/button"
+import { getCdnUrl } from "@/lib/cdn"
 
-/**
- * 홈 페이지: 히어로(GIF/동영상/이미지 + 애니메이션), 카테고리, 인기/신상품
- * - GIF: NEXT_PUBLIC_HERO_GIF_URL 또는 HeroSection gifSrc
- * - 동영상: NEXT_PUBLIC_HERO_VIDEO_URL 또는 videoSrc (GIF 없을 때)
- */
+// 히어로 에셋 캐시 무효화 버전입니다. 이미지가 갱신되지 않으면 이 값만 올리면 됩니다.
+const HERO_ASSET_VERSION =
+  process.env.NEXT_PUBLIC_HERO_ASSET_VERSION || "20260217-hero-1"
+
+// 정적 에셋 URL 뒤에 버전 쿼리를 붙여 브라우저/CDN 캐시를 확실히 갱신합니다.
+const withAssetVersion = (src: string) => {
+  const separator = src.includes("?") ? "&" : "?"
+  return `${src}${separator}v=${encodeURIComponent(HERO_ASSET_VERSION)}`
+}
+
 export default function Home() {
-  const heroGifSrc = typeof process.env.NEXT_PUBLIC_HERO_GIF_URL === "string"
-    ? process.env.NEXT_PUBLIC_HERO_GIF_URL
-    : undefined
-  // 사용자가 요청한 로컬 비디오 파일 경로 사용
-  const heroVideoSrc = "/main/1.mp4"
+  const heroGifSrc =
+    typeof process.env.NEXT_PUBLIC_HERO_GIF_URL === "string"
+      ? withAssetVersion(process.env.NEXT_PUBLIC_HERO_GIF_URL)
+      : undefined
+
+  // 사용자 요청으로 로컬 비디오 파일 경로를 사용합니다.
+  const heroVideoSrc = withAssetVersion("/main/1.mp4")
+  const heroPosterSrc = withAssetVersion("/main/1.webp")
 
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="flex min-h-screen flex-col">
       <NavBar />
 
       <main className="flex-1 bg-gradient-to-b from-background via-background to-muted/20">
-        <HeroSection gifSrc={heroGifSrc} videoSrc={heroVideoSrc} />
+        {/* 첫 진입 직후 API를 가볍게 예열해 카테고리/상세 진입 지연을 줄입니다. */}
+        <ApiWarmupPrimer />
+        <HeroSection
+          gifSrc={heroGifSrc}
+          videoSrc={heroVideoSrc}
+          posterSrc={heroPosterSrc}
+        />
 
-        {/* Categories: 남성/여성/액세서리/신발 카테고리 그리드 링크 */}
-        <section className="py-12 container mx-auto px-4">
+        <section className="container mx-auto px-4 py-12">
           <div className="mb-6">
-            <p className="text-xs font-semibold tracking-[0.16em] uppercase text-muted-foreground">Shop By Edit</p>
-            <h2 className="text-2xl md:text-3xl font-bold mt-1">카테고리</h2>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+              Shop By Edit
+            </p>
+            <h2 className="mt-1 text-2xl font-bold md:text-3xl">카테고리</h2>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
             <CategoryCard
               href="/category/men"
               label="남성"
-              images={["/category/men.png", "/category/men2.png"]}
+              // 카테고리 썸네일은 경량 WebP 2세트를 번갈아 사용해 초기 체감 속도를 높입니다.
+              images={[
+                getCdnUrl("static/category/men.webp"),
+                getCdnUrl("static/category/men2.webp"),
+              ]}
             />
             <CategoryCard
               href="/category/women"
               label="여성"
-              images={["/category/women.png", "/category/women2.png"]}
+              images={[
+                getCdnUrl("static/category/women.webp"),
+                getCdnUrl("static/category/women2.webp"),
+              ]}
             />
             <CategoryCard
               href="/category/accessories"
               label="액세서리"
-              images={["/category/accessories.png", "/category/accessories2.png"]}
+              images={[
+                getCdnUrl("static/category/accessories.webp"),
+                getCdnUrl("static/category/accessories2.webp"),
+              ]}
             />
             <CategoryCard
               href="/category/shoes"
               label="신발"
-              images={["/category/shoes.png", "/category/shoes2.png"]}
+              images={[
+                getCdnUrl("static/category/shoes.webp"),
+                getCdnUrl("static/category/shoes2.webp"),
+              ]}
             />
           </div>
         </section>
 
-        {/* Featured Products: 인기 상품 섹션 (배경 muted) */}
-        <section className="py-12 bg-gradient-to-r from-muted/50 via-muted to-muted/40 border-y">
+        <section className="border-y bg-gradient-to-r from-muted/50 via-muted to-muted/40 py-12">
           <div className="container mx-auto px-4">
             <div className="mb-6">
-              <p className="text-xs font-semibold tracking-[0.16em] uppercase text-muted-foreground">Best Picks</p>
-              <h2 className="text-2xl md:text-3xl font-bold mt-1">인기 상품</h2>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                Best Picks
+              </p>
+              <h2 className="mt-1 text-2xl font-bold md:text-3xl">인기 상품</h2>
             </div>
             <FeaturedProducts />
           </div>
         </section>
 
-        {/* New Arrivals: 신상품 목록 + "더 보기" 버튼 */}
-        <section className="py-12 container mx-auto px-4">
+        <section className="container mx-auto px-4 py-12">
           <div className="mb-6">
-            <p className="text-xs font-semibold tracking-[0.16em] uppercase text-muted-foreground">Latest Drop</p>
-            <h2 className="text-2xl md:text-3xl font-bold mt-1">신상품</h2>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+              Latest Drop
+            </p>
+            <h2 className="mt-1 text-2xl font-bold md:text-3xl">신상품</h2>
           </div>
           <NewProducts />
           <div className="mt-8 text-center">
@@ -88,18 +120,17 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Promotion Banner: 신규 회원 10% 할인 CTA */}
-        <section className="py-12 bg-primary text-primary-foreground relative overflow-hidden">
-          <div className="absolute inset-0 pointer-events-none">
+        <section className="relative overflow-hidden bg-primary py-12 text-primary-foreground">
+          <div className="pointer-events-none absolute inset-0">
             <div className="absolute -left-16 -top-16 h-56 w-56 rounded-full bg-white/10 blur-2xl" />
-            <div className="absolute -right-16 -bottom-16 h-64 w-64 rounded-full bg-white/10 blur-2xl" />
+            <div className="absolute -bottom-16 -right-16 h-64 w-64 rounded-full bg-white/10 blur-2xl" />
           </div>
           <div className="container mx-auto px-4 text-center">
-            <h2 className="text-2xl md:text-3xl font-bold mb-4">
+            <h2 className="mb-4 text-2xl font-bold md:text-3xl">
               신규 회원 가입 시 10% 할인
             </h2>
             <p className="mb-6">
-              지금 가입하고 첫 구매 시 10% 할인 혜택을 받아보세요.
+              지금 가입하고 첫 구매 때 10% 할인 혜택을 받아보세요.
             </p>
             <Button size="lg" variant="secondary" asChild>
               <Link href="/register">회원가입</Link>
@@ -110,155 +141,111 @@ export default function Home() {
         <HomeDeliveryMapSection />
       </main>
 
-      {/* 푸터: 4열 링크 그룹(고객서비스/쇼핑/회사/법적고지) + 저작권 */}
-      <footer className="border-t py-8 bg-muted/50">
+      <footer className="border-t bg-muted/50 py-8">
         <div className="container mx-auto px-4">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+          <div className="grid grid-cols-1 gap-8 md:grid-cols-4">
             <div>
-              <h3 className="font-semibold mb-4">고객 서비스</h3>
+              <h3 className="mb-4 font-semibold">고객 서비스</h3>
               <ul className="space-y-2">
                 <li>
-                  <Link
-                    href="/help"
-                    className="text-sm text-muted-foreground hover:text-foreground"
-                  >
+                  <Link href="/help" className="text-sm text-muted-foreground hover:text-foreground">
                     고객센터
                   </Link>
                 </li>
                 <li>
-                  <Link
-                    href="/faq"
-                    className="text-sm text-muted-foreground hover:text-foreground"
-                  >
+                  <Link href="/faq" className="text-sm text-muted-foreground hover:text-foreground">
                     자주 묻는 질문
                   </Link>
                 </li>
                 <li>
-                  <Link
-                    href="/shipping"
-                    className="text-sm text-muted-foreground hover:text-foreground"
-                  >
+                  <Link href="/shipping" className="text-sm text-muted-foreground hover:text-foreground">
                     배송 정보
                   </Link>
                 </li>
                 <li>
-                  <Link
-                    href="/returns"
-                    className="text-sm text-muted-foreground hover:text-foreground"
-                  >
+                  <Link href="/returns" className="text-sm text-muted-foreground hover:text-foreground">
                     교환 및 반품
                   </Link>
                 </li>
               </ul>
             </div>
+
             <div>
-              <h3 className="font-semibold mb-4">쇼핑하기</h3>
+              <h3 className="mb-4 font-semibold">쇼핑하기</h3>
               <ul className="space-y-2">
                 <li>
-                  <Link
-                    href="/category/men"
-                    className="text-sm text-muted-foreground hover:text-foreground"
-                  >
+                  <Link href="/category/men" className="text-sm text-muted-foreground hover:text-foreground">
                     남성
                   </Link>
                 </li>
                 <li>
-                  <Link
-                    href="/category/women"
-                    className="text-sm text-muted-foreground hover:text-foreground"
-                  >
+                  <Link href="/category/women" className="text-sm text-muted-foreground hover:text-foreground">
                     여성
                   </Link>
                 </li>
                 <li>
-                  <Link
-                    href="/category/accessories"
-                    className="text-sm text-muted-foreground hover:text-foreground"
-                  >
+                  <Link href="/category/accessories" className="text-sm text-muted-foreground hover:text-foreground">
                     액세서리
                   </Link>
                 </li>
                 <li>
-                  <Link
-                    href="/category/sale"
-                    className="text-sm text-muted-foreground hover:text-foreground"
-                  >
+                  <Link href="/category/sale" className="text-sm text-muted-foreground hover:text-foreground">
                     세일
                   </Link>
                 </li>
               </ul>
             </div>
+
             <div>
-              <h3 className="font-semibold mb-4">회사 정보</h3>
+              <h3 className="mb-4 font-semibold">회사 정보</h3>
               <ul className="space-y-2">
                 <li>
-                  <Link
-                    href="/about"
-                    className="text-sm text-muted-foreground hover:text-foreground"
-                  >
+                  <Link href="/about" className="text-sm text-muted-foreground hover:text-foreground">
                     회사 소개
                   </Link>
                 </li>
                 <li>
-                  <Link
-                    href="/careers"
-                    className="text-sm text-muted-foreground hover:text-foreground"
-                  >
+                  <Link href="/careers" className="text-sm text-muted-foreground hover:text-foreground">
                     채용 정보
                   </Link>
                 </li>
                 <li>
-                  <Link
-                    href="/press"
-                    className="text-sm text-muted-foreground hover:text-foreground"
-                  >
+                  <Link href="/press" className="text-sm text-muted-foreground hover:text-foreground">
                     보도 자료
                   </Link>
                 </li>
                 <li>
-                  <Link
-                    href="/sustainability"
-                    className="text-sm text-muted-foreground hover:text-foreground"
-                  >
+                  <Link href="/sustainability" className="text-sm text-muted-foreground hover:text-foreground">
                     지속 가능성
                   </Link>
                 </li>
               </ul>
             </div>
+
             <div>
-              <h3 className="font-semibold mb-4">법적 고지</h3>
+              <h3 className="mb-4 font-semibold">법적 고지</h3>
               <ul className="space-y-2">
                 <li>
-                  <Link
-                    href="/terms"
-                    className="text-sm text-muted-foreground hover:text-foreground"
-                  >
+                  <Link href="/terms" className="text-sm text-muted-foreground hover:text-foreground">
                     이용약관
                   </Link>
                 </li>
                 <li>
-                  <Link
-                    href="/privacy"
-                    className="text-sm text-muted-foreground hover:text-foreground"
-                  >
+                  <Link href="/privacy" className="text-sm text-muted-foreground hover:text-foreground">
                     개인정보처리방침
                   </Link>
                 </li>
                 <li>
-                  <Link
-                    href="/cookies"
-                    className="text-sm text-muted-foreground hover:text-foreground"
-                  >
+                  <Link href="/cookies" className="text-sm text-muted-foreground hover:text-foreground">
                     쿠키 정책
                   </Link>
                 </li>
               </ul>
             </div>
           </div>
-          <div className="mt-8 pt-8 border-t text-center text-sm text-muted-foreground">
-            <p>
-              &copy; {new Date().getFullYear()} ASOS Style. All rights reserved.
-            </p>
+
+          <div className="mt-8 border-t pt-8 text-center text-sm text-muted-foreground">
+            <p>&copy; {new Date().getFullYear()} KUS 스타일. All rights reserved.</p>
           </div>
         </div>
       </footer>

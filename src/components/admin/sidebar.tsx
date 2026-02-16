@@ -51,7 +51,7 @@ export function AdminSidebar() {
   return (
     <div className="flex flex-col h-full border-r bg-muted/10">
       <div className="p-6">
-        <h2 className="text-lg font-semibold">ASOS 관리자</h2>
+        <h2 className="text-lg font-semibold">KUS 관리자</h2>
       </div>
       <div className="flex-1 px-3 py-2">
         <nav className="space-y-1">

@@ -28,6 +28,7 @@
 import { useState, useEffect } from "react"
 import ProductCard from "@/components/product-card"
 import { safeParseJson } from "@/lib/utils"
+import { LoadingSpinner } from "@/components/ui/loading-spinner"
 
 interface Product {
   id: string | number
@@ -73,7 +74,12 @@ export function RecommendedProducts({ currentProductId }: RecommendedProductsPro
   }, [currentProductId])
 
   if (isLoading) {
-    return <div className="text-center py-8">추천 상품을 불러오는 중...</div>
+    return (
+      <div className="py-8">
+        {/* 추천 섹션 로딩은 공통 스피너로 통일합니다. */}
+        <LoadingSpinner size={24} label="추천 상품을 불러오는 중" />
+      </div>
+    )
   }
 
   if (error) {

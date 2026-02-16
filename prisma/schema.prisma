@@ -68,6 +68,11 @@ model Product {
   images        Image[]
   cartItems     CartItem[]
   wishlistItems WishlistEntry[]
+
+  // 카테고리 목록/정렬 조회를 빠르게 하기 위한 인덱스
+  @@index([status, category, createdAt])
+  // "신상품(전체 최신순)" 조회를 빠르게 하기 위한 인덱스
+  @@index([status, createdAt])
 }
 
 model Cart {
@@ -123,6 +128,9 @@ model Image {
   updatedAt DateTime @updatedAt
   Product   Product? @relation(fields: [productId], references: [id])
   productId Int?
+
+  // 상품 대표 이미지(첫 장) 조회를 빠르게 하기 위한 인덱스
+  @@index([productId, id])
 }
 
 enum DeliveryStatus {

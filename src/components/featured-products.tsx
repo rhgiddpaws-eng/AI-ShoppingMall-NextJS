@@ -37,6 +37,7 @@ import ProductCard from '@/components/product-card'
 import { apiRoutes } from '@/lib/apiRoutes'
 import { getCdnUrl } from '@/lib/cdn'
 import { safeParseJson } from '@/lib/utils'
+import { LoadingSpinner } from '@/components/ui/loading-spinner'
 
 interface ProductData {
   id: number
@@ -105,7 +106,8 @@ export function FeaturedProducts() {
             price: product.price,
             imageSrc:
               product.images && product.images.length > 0
-                ? getCdnUrl(product.images[0].original)
+                // 홈 목록 카드에는 썸네일 이미지를 사용해 로딩 지연을 줄입니다.
+                ? getCdnUrl(product.images[0].thumbnail || product.images[0].original)
                 : '/placeholder.svg',
             category: product.category || '기타',
             isNew: new Date(product.createdAt) > oneWeekAgo,
@@ -163,7 +165,11 @@ export function FeaturedProducts() {
 
   // 로딩 상태 표시
   if (isLoading) {
-    return <div className="text-center py-10">상품을 불러오는 중...</div>
+    return (
+      <div className="py-10">
+        <LoadingSpinner size={26} label="상품을 불러오는 중" />
+      </div>
+    )
   }
 
   return (

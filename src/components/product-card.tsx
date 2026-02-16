@@ -1,48 +1,20 @@
-'use client'
+"use client"
 
-/**
- * ProductCard — 상품 카드 (썸네일 + 뱃지 + 호버 시 담기/위시리스트)
- *
- * [모양]
- * - 카드: Link로 감싼 블록, aspect-[3/4] 이미지, object-cover, group-hover:scale-105
- * - 좌상단: 신상품(파란 Badge), 세일(빨간 Badge)
- * - 하단: 호버 시 올라오는 바 — 담기 버튼 + 하트(위시리스트 토글), cn()으로 opacity/translate 제어
- * - 하트가 위시리스트 포함 시 fill-current + text-red-500
- * - 텍스트: 상품명(line-clamp-1), 카테고리, 가격(세일 시 salePrice + 취소선 원가)
- *
- * [기능]
- * - 클릭: /product/[id] 이동
- * - 담기: addToCart(할인가 반영), sonner toast 성공 메시지
- * - 위시리스트: addToWishlist/removeFromWishlist, isInWishlist(id)로 하트 채움 상태 동기화
- * - 이벤트: e.preventDefault(), e.stopPropagation() 으로 링크 이동 방지
- *
- * [문법]
- * - isHovered 로 퀵 액션 바 표시 여부
- * - useEffect(() => setIsWishlisted(isInWishlist(id)), [id, isInWishlist]) 로 스토어와 동기화
- * - salePrice 있을 때만 할인가 표시
- *
- * [라이브러리 연계]
- * - next/image: Image (fill, sizes 반응형), priority
- * - next/link: Link
- * - lucide-react: Heart, ShoppingCart
- * - @/components/ui: Button, Badge
- * - @/lib/utils: cn (classnames 병합)
- * - @/lib/store: useShopStore (addToCart, addToWishlist, isInWishlist, removeFromWishlist)
- * - sonner: toast.success
- */
+import type React from "react"
 
-import type React from 'react'
+import { useEffect, useState } from "react"
+import Image from "next/image"
+import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { Heart, ShoppingCart } from "lucide-react"
+import { toast } from "sonner"
 
-import { useState, useEffect } from 'react'
-import Image from 'next/image'
-import Link from 'next/link'
-import { Heart, ShoppingCart } from 'lucide-react'
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { warmProductRoute } from "@/lib/route-warmup"
+import { useShopStore } from "@/lib/store"
+import { cn } from "@/lib/utils"
 
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { cn } from '@/lib/utils'
-import { useShopStore } from '@/lib/store'
-import { toast } from 'sonner'
 interface ProductCardProps {
   id: string
   name: string
@@ -54,6 +26,11 @@ interface ProductCardProps {
   salePrice?: number
 }
 
+/**
+ * 상품 카드입니다.
+ * - 상세 이동, 장바구니 담기, 위시리스트 토글을 제공합니다.
+ * - 마우스 진입 시 상세 라우트/데이터를 미리 예열합니다.
+ */
 export default function ProductCard({
   id,
   name,
@@ -64,18 +41,27 @@ export default function ProductCard({
   isSale = false,
   salePrice,
 }: ProductCardProps) {
+  const router = useRouter()
   const [isHovered, setIsHovered] = useState(false)
   const { addToCart, addToWishlist, isInWishlist, removeFromWishlist } =
     useShopStore()
   const [isWishlisted, setIsWishlisted] = useState(false)
 
+  const isRemoteImage =
+    imageSrc.startsWith("http://") || imageSrc.startsWith("https://")
+
+  // 카드에 마우스/포커스가 닿으면 상세 진입 전에 API를 예열합니다.
+  const prefetchProductDetail = () => {
+    warmProductRoute(router, id)
+  }
+
   useEffect(() => {
     setIsWishlisted(isInWishlist(id))
   }, [id, isInWishlist])
 
-  const handleAddToCart = (e: React.MouseEvent<HTMLButtonElement>) => {
-    e.preventDefault()
-    e.stopPropagation()
+  const handleAddToCart = (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault()
+    event.stopPropagation()
 
     const added = addToCart({
       id,
@@ -85,53 +71,65 @@ export default function ProductCard({
       quantity: 1,
       category,
     })
-    if (added) toast.success(`${name}이(가) 장바구니에 추가되었습니다.`)
+
+    if (added) {
+      toast.success(`${name}이(가) 장바구니에 추가되었습니다.`)
+    }
   }
 
-  const handleToggleWishlist = (e: React.MouseEvent<HTMLButtonElement>) => {
-    e.preventDefault()
-    e.stopPropagation()
+  const handleToggleWishlist = (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault()
+    event.stopPropagation()
 
     if (isWishlisted) {
       removeFromWishlist(id)
       setIsWishlisted(false)
       toast.success(`${name}이(가) 위시리스트에서 제거되었습니다.`)
-    } else {
-      const added = addToWishlist({
-        id,
-        name,
-        price,
-        imageSrc,
-        category,
-        salePrice: isSale ? salePrice : undefined,
-      })
-      if (added) {
-        setIsWishlisted(true)
-        toast.success(`${name}이(가) 위시리스트에 추가되었습니다.`)
-      }
+      return
+    }
+
+    const added = addToWishlist({
+      id,
+      name,
+      price,
+      imageSrc,
+      category,
+      salePrice: isSale ? salePrice : undefined,
+    })
+
+    if (added) {
+      setIsWishlisted(true)
+      toast.success(`${name}이(가) 위시리스트에 추가되었습니다.`)
     }
   }
 
   return (
     <Link
       href={`/product/${id}`}
+      // 목록 카드가 많을 때 과도한 prefetch 요청이 생기지 않도록 비활성화합니다.
+      prefetch={false}
       className="group block"
-      onMouseEnter={() => setIsHovered(true)}
+      onMouseEnter={() => {
+        setIsHovered(true)
+        prefetchProductDetail()
+      }}
       onMouseLeave={() => setIsHovered(false)}
+      onTouchStart={prefetchProductDetail}
+      onFocus={prefetchProductDetail}
     >
-      <div className="relative rounded-lg overflow-hidden">
-        <div className="aspect-[7/8] w-full relative bg-muted border border-gray-200 rounded-lg">
+      <div className="relative overflow-hidden rounded-lg">
+        <div className="relative aspect-[7/8] w-full rounded-lg border border-gray-200 bg-muted">
           <Image
-            src={imageSrc || '/placeholder.svg'}
+            src={imageSrc || "/placeholder.svg"}
             alt={name}
             fill
             sizes="(min-width: 1024px) 25vw, (min-width: 768px) 33vw, 50vw"
             className="scale-104 object-cover transition-transform duration-300 group-hover:scale-110"
-            priority
+            // CDN 경로는 이미 최적화 파일(WebP/썸네일)이라 Next 이미지 최적화를 건너뜁니다.
+            unoptimized={isRemoteImage}
           />
 
-          {/* Badges */}
-          <div className="absolute top-2 left-2 flex flex-col gap-1">
+          <div className="absolute left-2 top-2 flex flex-col gap-1">
             {isNew && (
               <Badge className="bg-blue-500 hover:bg-blue-500/90">신상품</Badge>
             )}
@@ -140,13 +138,10 @@ export default function ProductCard({
             )}
           </div>
 
-          {/* Quick actions */}
           <div
             className={cn(
-              'absolute bottom-0 left-0 right-0 bg-black/70 backdrop-blur-sm p-2 flex gap-2 transition-all duration-300',
-              isHovered
-                ? 'opacity-100 translate-y-0'
-                : 'opacity-0 translate-y-full',
+              "absolute bottom-0 left-0 right-0 flex gap-2 bg-black/70 p-2 backdrop-blur-sm transition-all duration-300",
+              isHovered ? "translate-y-0 opacity-100" : "translate-y-full opacity-0",
             )}
           >
             <Button
@@ -155,32 +150,29 @@ export default function ProductCard({
               className="flex-1 cursor-pointer"
               onClick={handleAddToCart}
             >
-              <ShoppingCart className="h-4 w-4 mr-1" />
+              <ShoppingCart className="mr-1 h-4 w-4" />
               담기
             </Button>
             <Button
               size="sm"
               variant="outline"
-              className={`bg-transparent border-white/50 hover:bg-white/20 hover:text-white cursor-pointer ${isWishlisted ? 'text-red-500' : 'text-white'
-                }`}
+              className={`cursor-pointer border-white/50 bg-transparent hover:bg-white/20 hover:text-white ${
+                isWishlisted ? "text-red-500" : "text-white"
+              }`}
               onClick={handleToggleWishlist}
             >
-              <Heart
-                className={`h-4 w-4 ${isWishlisted ? 'fill-current' : ''}`}
-              />
+              <Heart className={`h-4 w-4 ${isWishlisted ? "fill-current" : ""}`} />
             </Button>
           </div>
         </div>
 
         <div className="mt-2 py-4">
-          <h3 className="font-medium text-md line-clamp-2 min-w-0 break-words">{name}</h3>
-          <p className="text-xs text-muted-foreground mb-1">{category}</p>
+          <h3 className="line-clamp-2 min-w-0 break-words text-md font-medium">{name}</h3>
+          <p className="mb-1 text-xs text-muted-foreground">{category}</p>
           <div className="flex items-center gap-2">
             {isSale && salePrice ? (
               <>
-                <span className="font-semibold">
-                  {salePrice.toLocaleString()}원
-                </span>
+                <span className="font-semibold">{salePrice.toLocaleString()}원</span>
                 <span className="text-sm text-muted-foreground line-through">
                   {price.toLocaleString()}원
                 </span>

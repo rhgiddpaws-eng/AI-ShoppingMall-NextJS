@@ -29,13 +29,13 @@ export async function generateMetadata({
   const { infoSlug } = await params
   if (!isFooterInfoPageKey(infoSlug)) {
     return {
-      title: '페이지를 찾을 수 없습니다 | ASOS Style',
+      title: '페이지를 찾을 수 없습니다 | KUS 스타일',
     }
   }
 
   const pageData = FOOTER_INFO_PAGES[infoSlug]
   return {
-    title: `${pageData.title} | ASOS Style`,
+    title: `${pageData.title} | KUS 스타일`,
     description: pageData.summary,
   }
 }

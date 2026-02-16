@@ -3,20 +3,22 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import Script from "next/script"
 import { Bike, MapPin, Navigation } from "lucide-react"
-import type { DeliveryStatus } from "@/lib/orderEnums"
+
 import { getDeliveryStatusLabel } from "@/lib/deliveryStatus"
+import type { DeliveryStatus } from "@/lib/orderEnums"
 
 type RoutePoint = { lat: number; lng: number }
 type OverlayInstance = { setMap: (map: unknown | null) => void }
 type MarkerInstance = OverlayInstance & { setPosition: (position: unknown) => void }
 
-// 지도 오버레이 정리 단계에서 공통으로 필요한 최소 메서드만 타입으로 고정합니다.
+// 지도 오버레이 정리에 필요한 최소 메서드만 타입으로 선언합니다.
 type InfoWindowInstance = {
   close: () => void
   getMap: () => unknown
   open: (map: unknown, anchor: unknown) => void
   setMap: (map: unknown | null) => void
 }
+
 type EventListenerHandle = unknown
 
 declare global {
@@ -62,8 +64,14 @@ interface NaverDeliveryMapProps {
 
 const DEFAULT_STORE_LAT = 37.480783
 const DEFAULT_STORE_LNG = 126.89711
-// 준비/배송중/도착중/배송완료 단계까지 물건 마커를 유지해 출발-도착 흐름을 끊기지 않게 보여 줍니다.
-const TRACKING_STATUSES: DeliveryStatus[] = ["PREPARING", "IN_DELIVERY", "ARRIVING", "DELIVERED"]
+
+// 준비/배송중/도착예정/배송완료 단계에서 라이더 좌표를 지도에 표시합니다.
+const TRACKING_STATUSES: DeliveryStatus[] = [
+  "PREPARING",
+  "IN_DELIVERY",
+  "ARRIVING",
+  "DELIVERED",
+]
 
 const isFiniteNumber = (value: number | null | undefined): value is number =>
   typeof value === "number" && Number.isFinite(value)
@@ -87,15 +95,18 @@ function getPointOnPath(path: RoutePoint[], progress: number): RoutePoint {
 
   const segmentLengths: number[] = []
   let totalLength = 0
+
   for (let index = 0; index < path.length - 1; index += 1) {
     const segmentLength = getPointDistance(path[index], path[index + 1])
     segmentLengths.push(segmentLength)
     totalLength += segmentLength
   }
+
   if (totalLength <= 0) return path[path.length - 1]
 
   const targetLength = totalLength * progress
   let accumulatedLength = 0
+
   for (let index = 0; index < segmentLengths.length; index += 1) {
     const segmentLength = segmentLengths[index]
     const nextAccumulated = accumulatedLength + segmentLength
@@ -115,18 +126,23 @@ function getPointOnPath(path: RoutePoint[], progress: number): RoutePoint {
   return path[path.length - 1]
 }
 
-async function fetchRoadRoute(start: RoutePoint, goal: RoutePoint): Promise<RoutePoint[] | null> {
+async function fetchRoadRoute(
+  start: RoutePoint,
+  goal: RoutePoint,
+): Promise<RoutePoint[] | null> {
   const params = new URLSearchParams({
     startLat: start.lat.toString(),
     startLng: start.lng.toString(),
     goalLat: goal.lat.toString(),
     goalLng: goal.lng.toString(),
   })
+
   const response = await fetch(`/api/naver/directions?${params.toString()}`, {
     cache: "no-store",
   })
 
   if (!response.ok) return null
+
   const data = (await response.json()) as { path?: RoutePoint[] }
   if (!Array.isArray(data.path) || data.path.length < 2) return null
 
@@ -142,17 +158,20 @@ export function NaverDeliveryMap({
   riderLat,
   riderLng,
   deliveryStatus,
-  storeLabel = "내 위치",
-  customerLabel = "상대방 주소",
-  riderLabel = "배송 물건",
+  storeLabel = "매장 위치",
+  customerLabel = "고객 배송지",
+  riderLabel = "라이더",
   heightClassName = "h-64",
 }: NaverDeliveryMapProps) {
   const mapRef = useRef<HTMLDivElement | null>(null)
-  // 이전 좌표를 기억해 다음 갱신에서 마커 이동 애니메이션 시작점으로 사용합니다.
+
+  // 이전 좌표를 기억해 다음 갱신 때 라이더 마커 이동 애니메이션 시작점으로 사용합니다.
   const previousRiderPointRef = useRef<RoutePoint | null>(null)
+
   const [clientId, setClientId] = useState("")
   const [isClientIdLoaded, setIsClientIdLoaded] = useState(false)
   const [isReady, setIsReady] = useState(false)
+  const [isScriptError, setIsScriptError] = useState(false)
   const [roadRouteEnabled, setRoadRouteEnabled] = useState(true)
 
   const hasClientId = clientId.trim().length > 0
@@ -169,15 +188,15 @@ export function NaverDeliveryMap({
   }, [deliveryStatus, riderLat, riderLng])
 
   useEffect(() => {
-    // 주문 목적지가 바뀌면 이전 주문 좌표가 섞이지 않도록 시작점을 초기화합니다.
+    // 주문 목적지가 바뀌면 이전 라이더 좌표를 초기화해서 다른 주문이 섞이지 않게 합니다.
     previousRiderPointRef.current = null
   }, [shippingLat, shippingLng])
 
-  // 통합 콘솔에서 발급한 Maps 키는 ncpKeyId 파라미터로 로드해야 인증 실패를 줄일 수 있습니다.
-  const scriptSrc = useMemo(
-    () => `https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${encodeURIComponent(clientId)}`,
-    [clientId],
-  )
+  // ncpClientId, ncpKeyId 둘 다 전달해서 콘솔 키 설정 방식 차이로 인한 미노출을 줄입니다.
+  const scriptSrc = useMemo(() => {
+    const encoded = encodeURIComponent(clientId)
+    return `https://oapi.map.naver.com/openapi/v3/maps.js?ncpClientId=${encoded}&ncpKeyId=${encoded}`
+  }, [clientId])
 
   useEffect(() => {
     let cancelled = false
@@ -214,15 +233,25 @@ export function NaverDeliveryMap({
   }, [])
 
   useEffect(() => {
-    // 재진입 시 스크립트가 이미 로드된 상태여도, 컨테이너가 준비된 뒤 다시 초기화되도록 가드한다.
-    if (!hasClientId || !isClientIdLoaded || !isReady || !mapRef.current || !window.naver?.maps) return
+    if (
+      !hasClientId ||
+      !isClientIdLoaded ||
+      !isReady ||
+      isScriptError ||
+      !mapRef.current ||
+      !window.naver?.maps
+    ) {
+      return
+    }
 
     const maps = window.naver.maps
     const storePoint: RoutePoint = { lat: resolvedStoreLat, lng: resolvedStoreLng }
     const destinationPoint: RoutePoint = { lat: shippingLat, lng: shippingLng }
+
     const previousRiderPoint = previousRiderPointRef.current
     const riderAnimationStartPoint =
-      riderPoint != null ? previousRiderPoint ?? storePoint : null
+      riderPoint != null ? (previousRiderPoint ?? storePoint) : null
+
     const shouldAnimateRider =
       riderPoint != null &&
       riderAnimationStartPoint != null &&
@@ -248,9 +277,8 @@ export function NaverDeliveryMap({
       }
       animationFrameId = null
 
-      infoWindows.forEach((infoWindow) => {
+      infoWindows.forEach(infoWindow => {
         try {
-          // 브라우저마다 close 호출 시점 오류가 있어, 열린 경우에만 닫도록 방어합니다.
           if (infoWindow.getMap()) {
             infoWindow.close()
           }
@@ -260,7 +288,7 @@ export function NaverDeliveryMap({
       })
       infoWindows = []
 
-      overlays.forEach((overlay) => {
+      overlays.forEach(overlay => {
         try {
           overlay.setMap(null)
         } catch (error) {
@@ -269,7 +297,7 @@ export function NaverDeliveryMap({
       })
       overlays = []
 
-      eventListeners.forEach((listener) => {
+      eventListeners.forEach(listener => {
         if (listener == null) return
         try {
           maps.Event.removeListener?.(listener)
@@ -296,10 +324,10 @@ export function NaverDeliveryMap({
         isDefaultOpen = false,
       ) => {
         const content = [
-          `<div style="padding:8px 10px;min-width:120px;font-size:12px;line-height:1.35;">`,
+          '<div style="padding:8px 10px;min-width:120px;font-size:12px;line-height:1.35;">',
           `<strong style="display:block;color:#111827;margin-bottom:2px;">${label}</strong>`,
           `<span style="color:#4b5563;">${point.lat.toFixed(5)}, ${point.lng.toFixed(5)}</span>`,
-          `</div>`,
+          "</div>",
         ].join("")
 
         const infoWindow = new maps.InfoWindow({ content })
@@ -315,6 +343,7 @@ export function NaverDeliveryMap({
           eventListeners.push(listener)
         }
         infoWindows.push(infoWindow)
+
         if (isDefaultOpen) {
           infoWindow.open(map, marker)
         }
@@ -328,7 +357,8 @@ export function NaverDeliveryMap({
       overlays.push(storeMarker)
       bindInfoWindow(storeMarker, storeLabel, storePoint, !riderPoint)
 
-      const showDestinationMarker = riderPoint != null || !isSamePoint(storePoint, destinationPoint)
+      const showDestinationMarker =
+        riderPoint != null || !isSamePoint(storePoint, destinationPoint)
       if (showDestinationMarker) {
         const destinationMarker = new maps.Marker({
           map,
@@ -342,7 +372,10 @@ export function NaverDeliveryMap({
       let riderMarker: MarkerInstance | null = null
       if (riderPoint) {
         const riderMarkerStartPoint =
-          shouldAnimateRider && riderAnimationStartPoint ? riderAnimationStartPoint : riderPoint
+          shouldAnimateRider && riderAnimationStartPoint
+            ? riderAnimationStartPoint
+            : riderPoint
+
         riderMarker = new maps.Marker({
           map,
           position: toLatLng(riderMarkerStartPoint),
@@ -358,19 +391,20 @@ export function NaverDeliveryMap({
           ? !isSamePoint(storePoint, riderPoint)
           : !isSamePoint(storePoint, destinationPoint))
 
-      const [primaryRoadPath, secondaryRoadPath, riderAnimationRoadPath] = await Promise.all([
-        shouldRequestPrimaryRoute && riderPoint
-          ? fetchRoadRoute(storePoint, riderPoint).catch(() => null)
-          : shouldRequestPrimaryRoute && !riderPoint
-            ? fetchRoadRoute(storePoint, destinationPoint).catch(() => null)
+      const [primaryRoadPath, secondaryRoadPath, riderAnimationRoadPath] =
+        await Promise.all([
+          shouldRequestPrimaryRoute && riderPoint
+            ? fetchRoadRoute(storePoint, riderPoint).catch(() => null)
+            : shouldRequestPrimaryRoute && !riderPoint
+              ? fetchRoadRoute(storePoint, destinationPoint).catch(() => null)
+              : Promise.resolve(null),
+          roadRouteEnabled && riderPoint && !isSamePoint(riderPoint, destinationPoint)
+            ? fetchRoadRoute(riderPoint, destinationPoint).catch(() => null)
             : Promise.resolve(null),
-        roadRouteEnabled && riderPoint && !isSamePoint(riderPoint, destinationPoint)
-          ? fetchRoadRoute(riderPoint, destinationPoint).catch(() => null)
-          : Promise.resolve(null),
-        roadRouteEnabled && shouldAnimateRider && riderAnimationStartPoint && riderPoint
-          ? fetchRoadRoute(riderAnimationStartPoint, riderPoint).catch(() => null)
-          : Promise.resolve(null),
-      ])
+          roadRouteEnabled && shouldAnimateRider && riderAnimationStartPoint && riderPoint
+            ? fetchRoadRoute(riderAnimationStartPoint, riderPoint).catch(() => null)
+            : Promise.resolve(null),
+        ])
 
       if (isDisposed) {
         dispose()
@@ -383,7 +417,10 @@ export function NaverDeliveryMap({
 
       const primaryPath = riderPoint
         ? (primaryRoadPath ?? [storePoint, riderPoint])
-        : primaryRoadPath ?? (isSamePoint(storePoint, destinationPoint) ? [] : [storePoint, destinationPoint])
+        : primaryRoadPath ??
+          (isSamePoint(storePoint, destinationPoint)
+            ? []
+            : [storePoint, destinationPoint])
 
       const secondaryPath =
         riderPoint && !isSamePoint(riderPoint, destinationPoint)
@@ -395,7 +432,12 @@ export function NaverDeliveryMap({
           ? (riderAnimationRoadPath ?? [riderAnimationStartPoint, riderPoint])
           : []
 
-      const drawPolyline = (path: RoutePoint[], color: string, opacity: number, weight: number) => {
+      const drawPolyline = (
+        path: RoutePoint[],
+        color: string,
+        opacity: number,
+        weight: number,
+      ) => {
         if (path.length < 2) return
         const polyline = new maps.Polyline({
           map,
@@ -411,16 +453,17 @@ export function NaverDeliveryMap({
       drawPolyline(secondaryPath, "#2563eb", 0.55, 3)
 
       const bounds = new maps.LatLngBounds()
-      pointsForBounds.forEach((point) => bounds.extend(toLatLng(point)))
-      primaryPath.forEach((point) => bounds.extend(toLatLng(point)))
-      secondaryPath.forEach((point) => bounds.extend(toLatLng(point)))
+      pointsForBounds.forEach(point => bounds.extend(toLatLng(point)))
+      primaryPath.forEach(point => bounds.extend(toLatLng(point)))
+      secondaryPath.forEach(point => bounds.extend(toLatLng(point)))
       map.fitBounds(bounds)
 
       if (riderMarker && riderAnimationPath.length >= 2) {
-        // 이전 좌표 -> 현재 좌표를 보간해 마커가 점프하지 않고 이동하는 것처럼 보이게 만듭니다.
-        await new Promise<void>((resolve) => {
+        // 이전 좌표에서 현재 좌표까지 보간해 마커가 자연스럽게 이동하도록 만듭니다.
+        await new Promise<void>(resolve => {
           const durationMs = 1100
           const animationStartAt = performance.now()
+
           const step = (now: number) => {
             if (isDisposed) {
               resolve()
@@ -428,11 +471,12 @@ export function NaverDeliveryMap({
             }
 
             const rawProgress = Math.min(1, (now - animationStartAt) / durationMs)
-            // 시작/끝 구간을 완만하게 만들어 이동이 덜 튀게 보이도록 easeInOut을 적용합니다.
+            // 시작/끝 구간을 완만하게 처리해 이동이 덜 딱딱하게 보이도록 합니다.
             const easedProgress =
               rawProgress < 0.5
                 ? 2 * rawProgress * rawProgress
                 : 1 - Math.pow(-2 * rawProgress + 2, 2) / 2
+
             const nextPoint = getPointOnPath(riderAnimationPath, easedProgress)
             riderMarker?.setPosition(toLatLng(nextPoint))
 
@@ -440,14 +484,16 @@ export function NaverDeliveryMap({
               animationFrameId = window.requestAnimationFrame(step)
               return
             }
+
             animationFrameId = null
             resolve()
           }
+
           animationFrameId = window.requestAnimationFrame(step)
         })
       }
 
-      // 다음 갱신에서 현재 좌표를 시작점으로 쓰기 위해 최신 좌표를 저장합니다.
+      // 다음 갱신 애니메이션 시작점을 위해 최신 라이더 좌표를 저장합니다.
       previousRiderPointRef.current = riderPoint
     }
 
@@ -462,6 +508,7 @@ export function NaverDeliveryMap({
     hasClientId,
     isClientIdLoaded,
     isReady,
+    isScriptError,
     resolvedStoreLat,
     resolvedStoreLng,
     riderPoint,
@@ -476,7 +523,7 @@ export function NaverDeliveryMap({
     return (
       <div className="rounded-lg border bg-muted/30 p-4 text-sm text-muted-foreground">
         <div className="mb-1 font-medium text-foreground">지도 설정 확인 중</div>
-        <div>네이버 지도 키 설정을 불러오고 있습니다.</div>
+        <div>네이버 지도 키를 불러오고 있습니다.</div>
       </div>
     )
   }
@@ -485,14 +532,31 @@ export function NaverDeliveryMap({
     return (
       <div className="rounded-lg border bg-muted/30 p-4 text-sm text-muted-foreground">
         <div className="mb-1 font-medium text-foreground">지도 미설정</div>
-        <div>`NAVER_MAPS_CLIENT_ID`를 설정하면 배송 지도를 표시할 수 있습니다.</div>
+        <div>
+          <code>NAVER_MAPS_CLIENT_ID</code>를 설정하면 배송 지도를 표시할 수 있습니다.
+        </div>
+      </div>
+    )
+  }
+
+  if (isScriptError) {
+    return (
+      <div className="rounded-lg border bg-muted/30 p-4 text-sm text-muted-foreground">
+        <div className="mb-1 font-medium text-foreground">지도 스크립트 로딩 실패</div>
+        <div>도메인 허용 설정 또는 지도 키 권한을 확인해 주세요.</div>
       </div>
     )
   }
 
   return (
     <div className="space-y-3">
-      <Script src={scriptSrc} strategy="afterInteractive" onLoad={() => setIsReady(true)} />
+      <Script
+        src={scriptSrc}
+        strategy="afterInteractive"
+        onLoad={() => setIsReady(true)}
+        onError={() => setIsScriptError(true)}
+      />
+
       <div className="rounded-xl border bg-background p-3">
         <div className="mb-2 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
           <span className="inline-flex items-center gap-1">
@@ -510,7 +574,9 @@ export function NaverDeliveryMap({
             </span>
           )}
           {deliveryStatus ? (
-            <span className="font-medium text-foreground">상태: {getDeliveryStatusLabel(deliveryStatus)}</span>
+            <span className="font-medium text-foreground">
+              상태: {getDeliveryStatusLabel(deliveryStatus)}
+            </span>
           ) : null}
           <span>
             {riderPoint
@@ -518,12 +584,16 @@ export function NaverDeliveryMap({
               : `${shippingLat.toFixed(5)}, ${shippingLng.toFixed(5)}`}
           </span>
         </div>
+
         <div
           ref={mapRef}
           className={`w-full min-h-[220px] ${heightClassName} rounded-lg border bg-muted`}
         />
       </div>
-      {shippingAddress ? <p className="text-xs text-muted-foreground break-words">{shippingAddress}</p> : null}
+
+      {shippingAddress ? (
+        <p className="break-words text-xs text-muted-foreground">{shippingAddress}</p>
+      ) : null}
     </div>
   )
 }

@@ -3,7 +3,9 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import Image from "next/image"
+import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
+import { warmCategoryRoute } from "@/lib/route-warmup"
 
 interface CategoryCardProps {
     href: string
@@ -18,6 +20,7 @@ export function CategoryCard({
     label,
     interval = 4000,
 }: CategoryCardProps) {
+    const router = useRouter()
     const [index, setIndex] = useState(0)
 
     useEffect(() => {
@@ -33,6 +36,11 @@ export function CategoryCard({
     return (
         <Link
             href={href}
+            // 자동 prefetch 대신, 사용자가 카드에 의도를 보일 때 API까지 함께 예열합니다.
+            prefetch={false}
+            onMouseEnter={() => warmCategoryRoute(router, href)}
+            onTouchStart={() => warmCategoryRoute(router, href)}
+            onFocus={() => warmCategoryRoute(router, href)}
             className="group relative h-[150px] sm:h-[200px] md:h-[270px] lg:h-[340px] rounded-lg overflow-hidden block"
         >
             <div className="absolute inset-0 w-full h-full bg-gray-200">
@@ -51,7 +59,9 @@ export function CategoryCard({
                             fill
                             sizes="(max-width: 768px) 50vw, 25vw"
                             className="object-cover group-hover:scale-105 transition-transform duration-500"
-                            priority={index === 0}
+                            // 카테고리 썸네일은 S3 WebP를 그대로 써서 초기 재인코딩 지연을 줄입니다.
+                            unoptimized
+                            // 카드가 4개 이상 동시에 보이므로 eager 로딩을 피해서 초기 트래픽을 줄입니다.
                         />
                     </motion.div>
                 </AnimatePresence>

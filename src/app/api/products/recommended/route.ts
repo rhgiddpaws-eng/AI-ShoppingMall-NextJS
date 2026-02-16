@@ -1,102 +1,225 @@
-// =============================================================================
-// 추천 상품 API - GET /api/products/recommended
-// 쿼리: exclude(제외할 상품 ID) → 임베딩 기반 유사 상품 추천 목록 반환
-// DATABASE_URL(Prisma) 단일 연결 사용 — 도커에서 PG_HOST/PG_PORT 불필요
+﻿// =============================================================================
+// 추천 상품 API - GET /api/products/recommended?exclude={id}
+// - 실시간 OpenAI 호출 없이 DB 벡터 기반 추천 + 카테고리 fallback으로 동작합니다.
 // =============================================================================
 
 import { NextResponse } from "next/server"
-import prismaClient from '@/lib/prismaClient'
-import { getCdnUrl } from '@/lib/cdn'
-import OpenAI from 'openai'
-import pgvector from 'pgvector'
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-})
+import prismaClient from "@/lib/prismaClient"
+import { getCdnUrl } from "@/lib/cdn"
 
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url)
-  const excludeId = searchParams.get("exclude")
-  
-  if (!excludeId) {
-    return NextResponse.json({ error: "상품 ID가 필요합니다" }, { status: 400 })
-  }
+// DB와 가까운 리전을 우선 사용해서 추천 쿼리 응답 시간을 줄입니다.
+export const preferredRegion = "syd1"
 
-  try {
-    // 현재 상품 정보 가져오기 (쇼핑몰에는 PUBLISHED만 노출)
-    const product = await prismaClient.product.findFirst({
-      where: {
-        id: parseInt(excludeId),
-        status: "PUBLISHED",
-      },
-    })
+type SimilarRow = {
+  id: number
+}
 
-    if (!product) {
-      return NextResponse.json({ error: "상품을 찾을 수 없습니다" }, { status: 404 })
-    }
+type ProductWithImage = {
+  id: number
+  name: string
+  price: number
+  category: string | null
+  images: Array<{
+    id: number
+    original: string
+    thumbnail: string
+  }>
+}
 
-    // 상품명 임베딩 생성
-    const embedding = await openai.embeddings.create({
-      model: 'text-embedding-3-small',
-      input: product.name,
-      encoding_format: 'float',
-    })
-    const embeddings = embedding.data[0].embedding
-    const postEmb = pgvector.toSql(embeddings)
-
-    // 유사한 상품 검색 — Prisma $queryRawUnsafe(DATABASE_URL) 사용, 도커에서 별도 PG_* 불필요
-    type SimilarRow = { id: number; name: string; price: number; category: string | null }
-    const similarRows = (await prismaClient.$queryRawUnsafe(
-      `
-      WITH similar_products AS (
-        SELECT 
-          p.id, p.name, p.price, p.category,
-          1 - (p.vector <=> $1::vector) as similarity
-        FROM "Product" p
-        WHERE p.id <> $2 AND p.vector IS NOT NULL
-        ORDER BY similarity DESC
-        LIMIT 10
-      )
-      SELECT sp.id, sp.name, sp.price, sp.category
-      FROM similar_products sp
-      ORDER BY (similarity * 0.9) + (RANDOM() * 0.1) DESC
-      LIMIT 4
-      `,
-      postEmb,
-      parseInt(excludeId, 10)
-    )) as SimilarRow[]
-    const productIds = similarRows.map((p: SimilarRow) => p.id)
-    
-    const productsWithImages = await prismaClient.product.findMany({
-      where: {
-        id: { in: productIds },
-        status: "PUBLISHED",
-      },
-      include: {
-        images: {
-          take: 1 // 첫 번째 이미지만 가져오기
-        }
-      }
-    })
-    
-    // 최종 결과 생성
-    const result = similarRows.map((row: SimilarRow) => {
-      type ProductWithImage = (typeof productsWithImages)[number]
-      const productWithImage = productsWithImages.find((p: ProductWithImage) => p.id === row.id)
-      const imageSrc = getCdnUrl(productWithImage?.images?.[0]?.original)
-      return {
-        id: row.id,
-        name: row.name,
-        price: row.price,
-        category: row.category,
-        imageSrc,
-      }
-    })
-    
-    return NextResponse.json(result)
-  } catch (error) {
-    console.error("추천 상품 조회 오류:", error)
-    return NextResponse.json({ error: "추천 상품을 가져오는데 실패했습니다" }, { status: 500 })
+function toRecommendedItem(product: ProductWithImage) {
+  return {
+    id: product.id,
+    name: product.name,
+    price: product.price,
+    category: product.category ?? "기타",
+    // 추천 카드는 thumbnail을 우선 사용해서 상세 진입 전 로딩 부담을 줄입니다.
+    imageSrc: getCdnUrl(product.images[0]?.thumbnail || product.images[0]?.original),
   }
 }
 
+async function findFallbackProducts(excludeId: number, categoryValue: string | null, limit = 4) {
+  const wherePrimary: Record<string, unknown> = {
+    status: "PUBLISHED",
+    id: { not: excludeId },
+  }
+  if (categoryValue) {
+    // category enum과 문자열 타입 충돌을 피하기 위해 런타임 값만 주입합니다.
+    wherePrimary.category = categoryValue
+  }
+
+  const primary = await prismaClient.product.findMany({
+    where: wherePrimary as any,
+    select: {
+      id: true,
+      name: true,
+      price: true,
+      category: true,
+      images: {
+        take: 1,
+        orderBy: { id: "asc" },
+        select: {
+          id: true,
+          original: true,
+          thumbnail: true,
+        },
+      },
+    },
+    orderBy: { createdAt: "desc" },
+    take: limit,
+  })
+
+  if (primary.length >= limit) return primary
+
+  const remain = limit - primary.length
+  const existingIds = primary.map(product => product.id)
+  const secondary = await prismaClient.product.findMany({
+    where: {
+      status: "PUBLISHED",
+      id: { notIn: [excludeId, ...existingIds] },
+    },
+    select: {
+      id: true,
+      name: true,
+      price: true,
+      category: true,
+      images: {
+        take: 1,
+        orderBy: { id: "asc" },
+        select: {
+          id: true,
+          original: true,
+          thumbnail: true,
+        },
+      },
+    },
+    orderBy: { createdAt: "desc" },
+    take: remain,
+  })
+
+  return [...primary, ...secondary]
+}
+
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url)
+  const excludeIdRaw = searchParams.get("exclude")
+
+  if (!excludeIdRaw) {
+    return NextResponse.json({ error: "상품 ID가 필요합니다." }, { status: 400 })
+  }
+
+  const excludeId = Number(excludeIdRaw)
+  if (!Number.isInteger(excludeId) || excludeId <= 0) {
+    return NextResponse.json({ error: "유효하지 않은 상품 ID입니다." }, { status: 400 })
+  }
+
+  const currentProduct = await prismaClient.product.findFirst({
+    where: {
+      id: excludeId,
+      status: "PUBLISHED",
+    },
+    select: {
+      id: true,
+      category: true,
+    },
+  })
+
+  if (!currentProduct) {
+    return NextResponse.json({ error: "상품을 찾을 수 없습니다." }, { status: 404 })
+  }
+
+  const currentCategory = currentProduct.category
+
+  try {
+    // 현재 상품 벡터를 기준으로 유사 상품 ID를 먼저 가져옵니다.
+    const similarRows = await prismaClient.$queryRaw<SimilarRow[]>`
+      WITH target AS (
+        SELECT "vector"
+        FROM "Product"
+        WHERE "id" = ${excludeId}
+          AND "status" = 'PUBLISHED'
+          AND "vector" IS NOT NULL
+      )
+      SELECT p."id"
+      FROM "Product" p
+      CROSS JOIN target t
+      WHERE p."id" <> ${excludeId}
+        AND p."status" = 'PUBLISHED'
+        AND p."vector" IS NOT NULL
+      ORDER BY p."vector" <=> t."vector" ASC
+      LIMIT 4
+    `
+
+    if (similarRows.length > 0) {
+      const orderedIds = similarRows.map(row => row.id)
+      const withImages = await prismaClient.product.findMany({
+        where: {
+          id: { in: orderedIds },
+          status: "PUBLISHED",
+        },
+        select: {
+          id: true,
+          name: true,
+          price: true,
+          category: true,
+          images: {
+            take: 1,
+            orderBy: { id: "asc" },
+            select: {
+              id: true,
+              original: true,
+              thumbnail: true,
+            },
+          },
+        },
+      })
+
+      // 벡터 유사도 순서를 유지하기 위해 ID 기준으로 다시 정렬합니다.
+      const productMap = new Map(withImages.map(product => [product.id, product]))
+      const orderedProducts = orderedIds.flatMap(id => {
+        const product = productMap.get(id)
+        return product ? [product] : []
+      })
+
+      return NextResponse.json(orderedProducts.map(toRecommendedItem), {
+        headers: {
+          "Cache-Control": "public, max-age=0, s-maxage=120, stale-while-revalidate=600",
+          "CDN-Cache-Control": "public, s-maxage=120, stale-while-revalidate=600",
+          "Vercel-CDN-Cache-Control": "public, s-maxage=180",
+        },
+      })
+    }
+
+    const fallbackProducts = await findFallbackProducts(excludeId, currentCategory, 4)
+    return NextResponse.json(fallbackProducts.map(toRecommendedItem), {
+      headers: {
+        "Cache-Control": "public, max-age=0, s-maxage=120, stale-while-revalidate=600",
+        "CDN-Cache-Control": "public, s-maxage=120, stale-while-revalidate=600",
+        "Vercel-CDN-Cache-Control": "public, s-maxage=180",
+      },
+    })
+  } catch (error) {
+    console.error("추천 상품 조회 오류:", error)
+
+    // 메인 로직에 오류가 있어도 화면은 끊기지 않도록 fallback을 우선 반환합니다.
+    try {
+      const safeFallback = await findFallbackProducts(excludeId, currentCategory, 4)
+      return NextResponse.json(safeFallback.map(toRecommendedItem), {
+        headers: {
+          "Cache-Control": "public, max-age=0, s-maxage=60, stale-while-revalidate=300",
+          "CDN-Cache-Control": "public, s-maxage=60, stale-while-revalidate=300",
+          "Vercel-CDN-Cache-Control": "public, s-maxage=90",
+        },
+      })
+    } catch (fallbackError) {
+      console.error("추천 상품 fallback 조회 오류:", fallbackError)
+      return NextResponse.json([], {
+        headers: {
+          "Cache-Control": "public, max-age=0, s-maxage=30, stale-while-revalidate=120",
+          "CDN-Cache-Control": "public, s-maxage=30, stale-while-revalidate=120",
+          "Vercel-CDN-Cache-Control": "public, s-maxage=60",
+        },
+      })
+    }
+  }
+}
