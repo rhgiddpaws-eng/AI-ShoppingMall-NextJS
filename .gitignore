@@ -3,10 +3,12 @@
 # dependencies
 /node_modules
 /.pnp
-.pnp.js
-
-# testing
-/coverage
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
 
 # next.js
 /.next/
@@ -15,22 +17,53 @@
 # production
 /build
 
-# misc
-.DS_Store
-*.pem
+# testing
+/coverage
 
-# debug
+# env (allow only .env.host for local DB etc.)
+.env*
+!.env.host
+
+# debug / logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+.pnpm-debug.log*
 
-# local env files
-.env*.local
-.env
+# misc
+.DS_Store
+*.pem
+*.tsbuildinfo
+next-env.d.ts
 
 # vercel
 .vercel
 
-# typescript
-*.tsbuildinfo
-next-env.d.ts
+# -----------------------------------------------------------------------------
+# 로컬 전용 / 업로드 불필요
+# -----------------------------------------------------------------------------
+# 자료 폴더 (저장소에 올리지 않음)
+기타자료/
+docs/
+DOCUMENT/
+scripts/products/
+AutoAgent/
+
+# Playwright MCP 로그
+.playwright-mcp/
+
+# 로컬 터널링 바이너리
+ngrok
+ngrok.exe
+
+# 스크립트 산출물 (이미지·임시 데이터 등)
+scripts/products_before/
+scripts/products/
+# force ignore docs/material folders and local agent log
+기타자료/
+docs/
+DOCUMENT/
+.codex-dev.log
+
+# AutoAgent
+AutoAgent/
