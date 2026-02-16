@@ -19,7 +19,8 @@
 
 ### 개발 워크플로우 (도커 이슈 시)
 - 변경사항 커밋 후 **push**하고, 도커 컨테이너는 중지한 뒤 **로컬에서 `pnpm dev`**로 개발·검증하는 것을 권장합니다.
-- 도커 이슈 재현이 필요할 때만 `docker-compose`로 띄워 확인합니다. 진행 상황은 [DOCUMENT/tasks.md](DOCUMENT/tasks.md)에서 체크리스트로 관리합니다.
+- 도커 이슈 재현이 필요할 때만 `docker-compose`로 띄워 확인합니다. 진행 상황은 [AutoAgent/tasks.md](AutoAgent/tasks.md) 체크리스트를 기준으로 관리합니다.
+- AutoAgent 운영 가이드는 [AutoAgent/README.md](AutoAgent/README.md)를 참고합니다.
 
 ---
 

@@ -5,7 +5,8 @@
 
 import { NextRequest } from 'next/server'
 import prismaClient from '@/lib/prismaClient'
-import { OrderStatus, PaymentStatus } from '@prisma/client'
+// Prisma named export 이슈를 피하기 위해 공용 enum 상수를 사용합니다.
+import { OrderStatus, PaymentStatus } from '@/lib/orderEnums'
 
 export async function POST(req: NextRequest) {
   

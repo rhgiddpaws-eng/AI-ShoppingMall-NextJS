@@ -6,7 +6,8 @@
  * - 개발 시 Hot Reload 시 여러 인스턴스가 생기는 것을 global에 캐시해 방지
  */
 
-import { PrismaClient } from "@prisma/client"
+// @prisma/client 초기화 스텁 이슈를 피하기 위해 생성된 클라이언트를 직접 import 합니다.
+import { PrismaClient } from "../../node_modules/.prisma/client"
 
 declare global {
   var prismaClient: PrismaClient | undefined

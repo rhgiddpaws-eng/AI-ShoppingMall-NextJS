@@ -3,6 +3,8 @@
 
 generator client {
   provider        = "prisma-client-js"
+  // @prisma/client가 기대하는 상대 경로(.prisma/client)에 직접 생성해서
+  // Vercel 빌드 시 "did not initialize yet" 오류를 방지합니다.
   output          = "../node_modules/.prisma/client"
   previewFeatures = ["postgresqlExtensions"]
   binaryTargets   = ["native", "debian-openssl-3.0.x", "rhel-openssl-3.0.x", "windows"]

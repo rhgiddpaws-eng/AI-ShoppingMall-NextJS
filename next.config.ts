@@ -28,6 +28,14 @@ const cdnHostname = (() => {
 
 const nextConfig: NextConfig = {
   serverExternalPackages: ['@prisma/client', 'prisma', '.prisma/client'],
+  // Vercel 빌드 워커가 Prisma 생성물을 누락하지 않도록 파일 추적 대상을 명시합니다.
+  outputFileTracingIncludes: {
+    '/api/**/*': [
+      './node_modules/.prisma/client/**/*',
+      './node_modules/@prisma/client/.prisma/client/**/*',
+      './prisma/schema.prisma',
+    ],
+  },
   images: {
     remotePatterns: [
       {

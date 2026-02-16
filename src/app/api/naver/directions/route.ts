@@ -44,7 +44,8 @@ function parseRoutePath(payload: unknown): RoutePoint[] | null {
     if (!Array.isArray(firstCandidate.path)) continue
 
     const path = firstCandidate.path
-      .map((point) => {
+      // 외부 API 응답 path 배열은 스키마가 고정되지 않아 unknown으로 먼저 받고 검증합니다.
+      .map((point: unknown) => {
         if (!Array.isArray(point) || point.length < 2) return null
         const lng = point[0]
         const lat = point[1]

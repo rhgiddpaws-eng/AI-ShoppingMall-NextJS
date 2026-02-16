@@ -5,7 +5,8 @@
 
 import { NextResponse } from 'next/server'
 import prismaClient from '@/lib/prismaClient'
-import { OrderStatus, PaymentStatus } from '@prisma/client'
+// Prisma named export 이슈를 피하기 위해 공용 enum 상수를 사용합니다.
+import { OrderStatus, PaymentStatus } from '@/lib/orderEnums'
 import { getAuthFromRequest } from '@/lib/authFromRequest'
 import { CartItem } from '@/lib/cart'
 import { geocodeAddress } from '@/lib/naverGeocode'
@@ -91,7 +92,8 @@ export async function POST(req: Request) {
     }
 
     // 데이터베이스 트랜잭션 처리
-    const createdOrder = await prismaClient.$transaction(async (prisma) => {
+    // TS 버전 차이로 인한 implicit any를 막기 위해 트랜잭션 클라이언트 타입을 명시합니다.
+    const createdOrder = await prismaClient.$transaction(async (prisma: any) => {
       try {
         // 주문 생성
         const order = await prisma.order.create({

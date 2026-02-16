@@ -49,9 +49,11 @@ export async function GET(
       return NextResponse.json({ error: '주문을 찾을 수 없습니다.' }, { status: 404 })
     }
 
+    // 원격 빌드에서 Prisma 타입 추론이 약해져도 콜백 파라미터 타입이 유지되도록 명시합니다.
+    type OrderItemRow = (typeof order.items)[number]
     const formattedOrder = {
       ...order,
-      items: order.items.map((item) => ({
+      items: order.items.map((item: OrderItemRow) => ({
         ...item,
         product: {
           ...item.product,

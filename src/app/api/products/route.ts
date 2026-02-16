@@ -5,23 +5,40 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import prismaClient from '@/lib/prismaClient'
-import { Category, Product, Image } from '@prisma/client'
+// @prisma/client의 개별 enum/model 타입 import 에러를 피하기 위해
+// API 응답에서 실제로 쓰는 최소 타입만 로컬로 정의합니다.
 
-export type ProductWithImages = Product & {
-  images: Image[]
+export type ProductImage = {
+  id: number
+  original: string
+  thumbnail: string
+}
+
+export type ProductWithImages = {
+  id: number
+  name: string
+  price: number
+  images: ProductImage[]
 }
 
 export type ProductsResponseType = ProductWithImages[]
 
 /** orderBy에 사용 가능한 Product 필드 (Prisma 쿼리 오류 방지) */
 const ALLOWED_SORT_KEYS = ['id', 'name', 'price', 'createdAt', 'updatedAt'] as const
+// 카테고리 입력을 DB enum 값으로 제한해서 잘못된 쿼리 입력을 방지합니다.
+const ALLOWED_CATEGORY_VALUES = ['MEN', 'WOMEN', 'ACCESSORIES', 'SHOES', 'SALE', 'NEW'] as const
+type ProductCategoryValue = (typeof ALLOWED_CATEGORY_VALUES)[number]
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
 
-  const category = searchParams.get('category')
+  const categoryRaw = searchParams.get('category')
     ? searchParams.get('category')?.toUpperCase()
     : null
+  const category =
+    categoryRaw != null && ALLOWED_CATEGORY_VALUES.includes(categoryRaw as ProductCategoryValue)
+      ? (categoryRaw as ProductCategoryValue)
+      : null
   const limitRaw = searchParams.get('limit') || '20'
   const sortRaw = searchParams.get('sort') || 'createdAt'
   const orderRaw = searchParams.get('order') || 'desc'
@@ -38,7 +55,7 @@ export async function GET(request: NextRequest) {
     const products = await prismaClient.product.findMany({
       where: {
         status: "PUBLISHED" as const,
-        ...(category != null && { category: category as Category }),
+        ...(category != null && { category }),
         ...(term && {
           name: {
             contains: term,

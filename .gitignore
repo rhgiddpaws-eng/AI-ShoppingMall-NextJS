@@ -47,6 +47,7 @@ next-env.d.ts
 docs/
 DOCUMENT/
 scripts/products/
+AutoAgent/
 
 # Playwright MCP 로그
 .playwright-mcp/
@@ -63,3 +64,6 @@ scripts/products/
 docs/
 DOCUMENT/
 .codex-dev.log
+
+# AutoAgent
+AutoAgent/

@@ -5,7 +5,8 @@
 
 import { NextResponse } from 'next/server'
 import prismaClient from '@/lib/prismaClient'
-import { OrderStatus, PaymentStatus, Order } from '@prisma/client'
+// Prisma named export 이슈를 피하기 위해 공용 enum 상수를 사용합니다.
+import { OrderStatus, PaymentStatus } from '@/lib/orderEnums'
 import { getAuthFromRequest } from '@/lib/authFromRequest'
 import { getCdnUrl } from '@/lib/cdn'
 
@@ -28,7 +29,11 @@ export interface FormattedOrderItem {
 // API 응답을 위한 주문 타입 정의
 // Omit<Order, 'items'> 문법은 Order 타입에서 'items' 필드만 제외한 타입을 만든다는 의미입니다.
 // 즉, Order 타입의 모든 필드는 포함하지만, 'items' 필드는 빼고 나머지만 상속받습니다.
-export interface FormattedOrder extends Omit<Order, 'items'> {
+// Prisma Order 모델 기본 필드는 findMany 반환 타입으로 추론해서 @prisma/client 타입 의존을 제거합니다.
+type OrderBase = Awaited<ReturnType<typeof prismaClient.order.findMany>>[number]
+
+// API 응답용 주문 타입은 기본 필드 + 화면 표시용 items/payment 필드를 합쳐서 정의합니다.
+export interface FormattedOrder extends OrderBase {
   items: FormattedOrderItem[];
   payment: {
     id: number

@@ -11,8 +11,8 @@ import { mapExternalStatusToDeliveryStatus } from "@/lib/courier/statusMapper"
 import type { PrismaTransactionClient } from "@/lib/prismaTransactionClient"
 
 // Prisma 네임스페이스 import 없이도 JSON payload 타입을 안전하게 맞추기 위한 추출 타입입니다.
-type DeliveryEventCreateArgs = Parameters<typeof prismaClient.deliveryEvent.create>[0]
-type DeliveryEventPayload = DeliveryEventCreateArgs["data"]["payload"]
+// 원격 빌드 환경에서는 Prisma 메서드 파라미터 추론이 달라질 수 있어
+// payload 타입은 저장 시점에 유연하게 처리하고, 의미 검증은 어댑터에서 수행합니다.
 
 function isUniqueDedupeError(error: unknown): boolean {
   // Prisma 오류 클래스 import 없이 code 값만 확인해 중복 웹훅(P2002)을 안전하게 처리합니다.
@@ -98,7 +98,9 @@ export async function POST(
           orderId: order.id,
           provider: event.provider,
           eventType: event.eventType,
-          payload: (event.rawPayload ?? {}) as DeliveryEventPayload,
+          // 공급사별 payload 스키마가 유동적이므로 저장 시점에는 any로 수용하고,
+          // 의미 해석은 normalizeWebhook에서 이미 끝낸 값을 사용합니다.
+          payload: (event.rawPayload ?? {}) as any,
           occurredAt: event.occurredAt ?? new Date(),
           dedupeKey: event.dedupeKey,
         },
