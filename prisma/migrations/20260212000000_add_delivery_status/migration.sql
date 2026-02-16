@@ -1,0 +1,8 @@
+-- CreateEnum
+CREATE TYPE "DeliveryStatus" AS ENUM ('ORDER_COMPLETE', 'PREPARING', 'IN_DELIVERY', 'ARRIVING', 'DELIVERED');
+
+-- AlterTable
+ALTER TABLE "Order" ADD COLUMN "deliveryStatus" "DeliveryStatus" DEFAULT 'ORDER_COMPLETE',
+ADD COLUMN "shippingAddress" TEXT,
+ADD COLUMN "shippingLat" DOUBLE PRECISION,
+ADD COLUMN "shippingLng" DOUBLE PRECISION;

@@ -1,0 +1,33 @@
+services:
+  webserver:
+    build: .  # 현재 디렉토리에서 Dockerfile을 빌드
+    image: nginx:latest
+    container_name: webserver
+    ports:
+      - "80:80"
+      - "443:443"
+    networks:
+      - yesnetwork
+    volumes:
+      - ./conf.d:/etc/nginx/conf.d
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - letsencrypt_data:/etc/letsencrypt:ro  # certbot이 발급한 인증서 (obtain-cert.sh 실행 후 생성)
+
+  # 인증서 발급용 (obtain-cert.sh 로만 실행). up -d 시에는 기동하지 않음 → 80 포트는 webserver만 사용
+  certbot:
+    image: certbot/certbot
+    container_name: certbot
+    profiles:
+      - cert  # docker compose up -d 시 certbot 미기동 → 80 포트 충돌 방지
+    environment:
+      - CERTBOT_EMAIL=${CERTBOT_EMAIL:-admin@ncott.shop}
+    volumes:
+      - letsencrypt_data:/etc/letsencrypt
+    entrypoint: /bin/sh -c "certbot certonly --standalone -d ncott.shop --non-interactive --agree-tos -m \"$${CERTBOT_EMAIL}\""
+
+volumes:
+  letsencrypt_data:
+
+networks:
+  yesnetwork:
+    external: true

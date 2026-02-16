@@ -1,0 +1,123 @@
+# 도커 사용법 (이 프로젝트 기준)
+
+## 1. 기본 Docker 명령어
+
+### 이미지 (image)
+  docker images                    # 이미지 목록
+  docker rmi <이미지ID|이름>       # 이미지 삭제
+  docker image prune -a            # 사용 안 하는 이미지 일괄 삭제
+
+### 컨테이너 (container)
+  docker ps                        # 실행 중인 컨테이너
+  docker ps -a                     # 중지된 것 포함 전체
+  docker stop <컨테이너이름|ID>     # 중지
+  docker start <컨테이너이름|ID>   # 다시 시작
+  docker restart <컨테이너이름|ID> # 재시작
+  docker rm <컨테이너이름|ID>      # 컨테이너 삭제 (중지 후)
+  docker container prune            # 중지된 컨테이너 일괄 삭제
+
+### 로그·접속
+  docker logs <컨테이너이름>       # 로그 보기
+  docker logs -f <컨테이너이름>    # 로그 실시간 (tail -f)
+  docker exec -it <컨테이너이름> sh   # 컨테이너 안 쉘 접속 (종료: exit)
+
+### 네트워크 (network)
+  docker network ls                # 네트워크 목록
+  docker network create <이름>     # 생성
+  docker network rm <이름>         # 삭제
+
+### 볼륨 (volume)
+  docker volume ls                 # 볼륨 목록
+  docker volume rm <이름>          # 볼륨 삭제
+  docker volume prune              # 사용 안 하는 볼륨 일괄 삭제
+
+
+## 2. Docker Compose 기본
+
+  docker compose -f <파일.yml> up -d        # 백그라운드 기동
+  docker compose -f <파일.yml> up -d --build # 빌드 후 기동
+  docker compose -f <파일.yml> down         # 중지 후 컨테이너·네트워크 제거
+  docker compose -f <파일.yml> ps           # 해당 compose 서비스 목록
+  docker compose -f <파일.yml> logs -f      # 로그 실시간
+
+  # 빌드 캐시 없이 다시 빌드 (Dockerfile/의존성 변경 시)
+  docker compose -f <파일.yml> build --no-cache
+  docker compose -f <파일.yml> up -d --build
+
+
+## 3. 이 프로젝트 실행 순서
+
+  # 1) 네트워크 생성 (한 번만)
+  docker network create yesnetwork
+
+  # 2) Postgres
+  cd docker-compose/postgres
+  docker compose -f postgres-compose.yml up -d
+  # DB 포트: 호스트 7432 → 컨테이너 5432
+
+  # 3) 앱 (프로젝트 루트 기준 .env.production 필요)
+  cd docker-compose/app
+  docker compose -f app-compose.yml up -d --build
+  # 앱 포트: 9100
+
+  # 4) nginx
+  cd docker-compose/nginx
+  docker compose -f nginx-compose.yml up -d
+  # 80, 443
+
+
+## 4. 이 프로젝트 컨테이너·포트
+
+  컨테이너 이름       서비스          포트(호스트)
+  ecommerce_db        Postgres        7432
+  ecommerce-app      Next.js 앱      9100
+  webserver          nginx           80, 443
+
+
+## 5. 자주 쓰는 명령 (이 프로젝트)
+
+  # Postgres 로그
+  docker logs -f ecommerce_db
+
+  # Postgres 컨테이너 안 접속 (psql)
+  docker exec -it ecommerce_db psql -U postgres postgres
+
+  # 앱 로그
+  docker logs -f ecommerce-app
+
+  # nginx 로그
+  docker logs -f webserver
+
+  # Postgres만 중지
+  docker stop ecommerce_db
+
+  # Postgres만 다시 기동
+  cd docker-compose/postgres
+  docker compose -f postgres-compose.yml up -d
+
+  # Postgres 이미지 다시 빌드 (Dockerfile 수정 후)
+  cd docker-compose/postgres
+  docker compose -f postgres-compose.yml build --no-cache
+  docker compose -f postgres-compose.yml up -d
+
+
+## 6. 전체 중지·삭제
+
+  # 각 디렉토리에서 down (볼륨은 유지)
+  cd docker-compose/nginx
+  docker compose -f nginx-compose.yml down
+
+  cd docker-compose/app
+  docker compose -f app-compose.yml down
+
+  cd docker-compose/postgres
+  docker compose -f postgres-compose.yml down
+
+  # Postgres 볼륨까지 삭제하면 DB 데이터 전부 삭제됨
+  docker compose -f postgres-compose.yml down -v
+
+
+## 7. 정리 (캐시·미사용 리소스 삭제)
+
+  docker system prune -a    # 미사용 이미지·컨테이너·네트워크 삭제 (볼륨 제외)
+  docker volume prune       # 미사용 볼륨 삭제 (필요 시만 사용)

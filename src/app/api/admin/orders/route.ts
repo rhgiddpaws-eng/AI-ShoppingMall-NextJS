@@ -1,0 +1,146 @@
+// =============================================================================
+// 관리자 주문 목록/상태 변경 API - /api/admin/orders
+// GET: 실 DB 주문 목록 조회(검색/필터/페이지네이션)
+// PUT: 배송 상태를 간단히 변경
+// =============================================================================
+
+import { NextResponse } from "next/server"
+import prismaClient from "@/lib/prismaClient"
+import { requireAdminSession } from "@/lib/requireAdminSession"
+// 배포 환경에서 Prisma enum export 차이로 빌드가 깨지는 일을 막기 위해 로컬 enum 타입을 사용합니다.
+import type { DeliveryStatus } from "@/lib/orderEnums"
+
+const DELIVERY_STATUS_VALUES: DeliveryStatus[] = [
+  "ORDER_COMPLETE",
+  "PREPARING",
+  "IN_DELIVERY",
+  "ARRIVING",
+  "DELIVERED",
+]
+
+export const dynamic = "force-dynamic"
+
+// Vercel(배포) 환경에서는 Prisma Client 타입 생성/해석 타이밍에 따라
+// `Prisma.OrderWhereInput` 같은 타입 export가 간헐적으로 누락되어 빌드가 깨진 적이 있습니다.
+// 그래서 여기서는 where 조건을 plain object로만 조립하고, Prisma 호출 시점에만 캐스팅합니다.
+type OrderWhereInput = Record<string, unknown>
+
+export async function GET(request: Request) {
+  const auth = await requireAdminSession(request)
+  if ("error" in auth) return auth.error
+
+  const { searchParams } = new URL(request.url)
+  const search = searchParams.get("search")?.trim() ?? ""
+  const deliveryStatus = searchParams.get("deliveryStatus")?.trim() ?? ""
+  const cursorRaw = searchParams.get("cursor")
+  const limitRaw = Number(searchParams.get("limit") ?? "20")
+
+  // 조회 건수는 과도한 요청을 막기 위해 상한/하한을 고정합니다.
+  const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), 100) : 20
+  const cursor = cursorRaw && Number.isFinite(Number(cursorRaw)) ? Number(cursorRaw) : null
+
+  const where: OrderWhereInput = {}
+  if (deliveryStatus && DELIVERY_STATUS_VALUES.includes(deliveryStatus as DeliveryStatus)) {
+    where.deliveryStatus = deliveryStatus as DeliveryStatus
+  }
+
+  if (search.length > 0) {
+    const searchConditions: OrderWhereInput[] = [
+      { user: { name: { contains: search, mode: "insensitive" } } },
+      { user: { email: { contains: search, mode: "insensitive" } } },
+      { trackingNumber: { contains: search, mode: "insensitive" } },
+      { externalDeliveryId: { contains: search, mode: "insensitive" } },
+    ]
+    if (Number.isFinite(Number(search))) {
+      searchConditions.push({ id: Number(search) })
+    }
+    where.OR = searchConditions
+  }
+
+  const orders = await prismaClient.order.findMany({
+    // Prisma where 타입은 런타임에만 필요하므로, 빌드 안정성을 위해 캐스팅 처리합니다.
+    where: where as any,
+    orderBy: { id: "desc" },
+    take: limit,
+    ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+    include: {
+      user: { select: { id: true, name: true, email: true } },
+      payment: { select: { status: true, paymentMethod: true } },
+      _count: { select: { items: true } },
+    },
+  })
+
+  const nextCursor = orders.length === limit ? orders[orders.length - 1].id : null
+
+  // Vercel 타입체크에서 map 콜백 파라미터가 any로 추론되지 않도록 주문 행 타입을 고정합니다.
+  type AdminOrderRow = (typeof orders)[number]
+  const formatted = orders.map((order: AdminOrderRow) => ({
+    id: order.id,
+    createdAt: order.createdAt,
+    totalAmount: order.totalAmount,
+    status: order.status,
+    deliveryStatus: order.deliveryStatus,
+    deliveryProvider: order.deliveryProvider,
+    externalDeliveryStatus: order.externalDeliveryStatus,
+    courierCode: order.courierCode,
+    trackingNumber: order.trackingNumber,
+    trackingUrl: order.trackingUrl,
+    dispatchedAt: order.dispatchedAt,
+    deliveredAt: order.deliveredAt,
+    itemCount: order._count.items,
+    customerName: order.user.name,
+    customerEmail: order.user.email,
+    paymentStatus: order.payment?.status ?? null,
+    paymentMethod: order.payment?.paymentMethod ?? null,
+  }))
+
+  return NextResponse.json(
+    { orders: formatted, nextCursor },
+    {
+      headers: {
+        "Cache-Control": "no-store",
+      },
+    },
+  )
+}
+
+export async function PUT(request: Request) {
+  const auth = await requireAdminSession(request)
+  if ("error" in auth) return auth.error
+
+  try {
+    const { orderId, deliveryStatus } = (await request.json()) as {
+      orderId?: number | string
+      deliveryStatus?: string
+    }
+
+    const parsedOrderId = Number(orderId)
+    if (!Number.isInteger(parsedOrderId)) {
+      return NextResponse.json({ error: "유효한 주문 ID가 아닙니다." }, { status: 400 })
+    }
+    if (!deliveryStatus || !DELIVERY_STATUS_VALUES.includes(deliveryStatus as DeliveryStatus)) {
+      return NextResponse.json({ error: "유효한 배송 상태가 아닙니다." }, { status: 400 })
+    }
+
+    const updated = await prismaClient.order.update({
+      where: { id: parsedOrderId },
+      data: {
+        deliveryStatus: deliveryStatus as DeliveryStatus,
+        deliveredAt: deliveryStatus === "DELIVERED" ? new Date() : undefined,
+      },
+      select: {
+        id: true,
+        deliveryStatus: true,
+        deliveredAt: true,
+      },
+    })
+
+    return NextResponse.json({
+      message: `주문 #${updated.id} 배송 상태를 변경했습니다.`,
+      order: updated,
+    })
+  } catch (error) {
+    console.error("관리자 주문 상태 변경 오류:", error)
+    return NextResponse.json({ error: "배송 상태 업데이트에 실패했습니다." }, { status: 400 })
+  }
+}

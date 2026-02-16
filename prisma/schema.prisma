@@ -1,0 +1,278 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider        = "prisma-client-js"
+  // @prisma/client가 기대하는 상대 경로(.prisma/client)에 직접 생성해서
+  // Vercel 빌드 시 "did not initialize yet" 오류를 방지합니다.
+  output          = "../node_modules/.prisma/client"
+  previewFeatures = ["postgresqlExtensions"]
+  binaryTargets   = ["native", "debian-openssl-3.0.x", "rhel-openssl-3.0.x", "windows"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [vector]
+}
+
+model User {
+  id                  Int      @id @default(autoincrement())
+  email               String   @unique
+  password            String?
+  name                String?
+  resetToken          String?
+  resetTokenExpiresAt DateTime?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  role                UserRole @default(BUYER)
+
+  orders            Order[]
+  addresses         Address[]
+  cart              Cart?
+  wishlist          Wishlist?
+  inquiries         Inquiry[]
+  riderLocationLogs RiderLocationLog[]
+}
+
+model Address {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  user       User     @relation(fields: [userId], references: [id])
+  address    String
+  extra      String?
+  postalCode String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+enum ProductStatus {
+  DRAFT
+  PUBLISHED
+}
+
+model Product {
+  id           Int                    @id @default(autoincrement())
+  name         String
+  description  String?
+  price        Float
+  stock        Int
+  discountRate Float                  @default(0)
+  category     Category?
+  status       ProductStatus          @default(PUBLISHED)
+  vector       Unsupported("vector")?
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @updatedAt
+
+  orderItems    OrderItem[]
+  images        Image[]
+  cartItems     CartItem[]
+  wishlistItems WishlistEntry[]
+}
+
+model Cart {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @unique
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items CartItem[]
+}
+
+model CartItem {
+  id        Int      @id @default(autoincrement())
+  cartId    Int
+  cart      Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  productId Int
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  quantity  Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([cartId, productId])
+}
+
+model Wishlist {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @unique
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items WishlistEntry[]
+}
+
+model WishlistEntry {
+  id         Int      @id @default(autoincrement())
+  wishlistId Int
+  wishlist   Wishlist @relation(fields: [wishlistId], references: [id], onDelete: Cascade)
+  productId  Int
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([wishlistId, productId])
+}
+
+model Image {
+  id        Int      @id @default(autoincrement())
+  original  String
+  thumbnail String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  Product   Product? @relation(fields: [productId], references: [id])
+  productId Int?
+}
+
+enum DeliveryStatus {
+  ORDER_COMPLETE
+  PREPARING
+  IN_DELIVERY
+  ARRIVING
+  DELIVERED
+}
+
+enum DeliveryProvider {
+  MOCK
+  KAKAO
+  BAROGO
+  VROONG
+  THINKING
+  INTERNAL
+}
+
+model Order {
+  id                     Int               @id @default(autoincrement())
+  user                   User              @relation(fields: [userId], references: [id])
+  userId                 Int
+  totalAmount            Float
+  status                 OrderStatus
+  deliveryStatus         DeliveryStatus?   @default(ORDER_COMPLETE)
+  deliveryProvider       DeliveryProvider?
+  externalDeliveryId     String?
+  externalDeliveryStatus String?
+  courierCode            String?
+  trackingNumber         String?
+  trackingUrl            String?
+  dispatchedAt           DateTime?
+  deliveredAt            DateTime?
+  shippingAddress        String?
+  shippingLat            Float?
+  shippingLng            Float?
+  riderLat               Float?
+  riderLng               Float?
+  riderUpdatedAt         DateTime?
+  createdAt              DateTime          @default(now())
+  updatedAt              DateTime          @updatedAt
+
+  items             OrderItem[]
+  payment           Payment?
+  inquiries         Inquiry[]
+  deliveryEvents    DeliveryEvent[]
+  riderLocationLogs RiderLocationLog[]
+
+  @@index([status, deliveryStatus])
+  @@index([externalDeliveryId])
+  @@index([trackingNumber])
+  @@index([deliveryProvider, externalDeliveryStatus])
+}
+
+model Inquiry {
+  id             Int      @id @default(autoincrement())
+  userId         Int
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orderId        Int?
+  order          Order?   @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  message        String
+  attachmentKeys String[] @default([])
+  replyMessage   String?
+  repliedAt      DateTime?
+  repliedBy      Int?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model DeliveryEvent {
+  id         Int      @id @default(autoincrement())
+  orderId    Int
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  provider   String
+  eventType  String
+  payload    Json
+  occurredAt DateTime?
+  receivedAt DateTime @default(now())
+  dedupeKey  String   @unique
+  createdAt  DateTime @default(now())
+
+  @@index([orderId, receivedAt])
+  @@index([provider, eventType])
+}
+
+model RiderLocationLog {
+  id         Int      @id @default(autoincrement())
+  orderId    Int
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  riderUserId Int?
+  riderUser  User?    @relation(fields: [riderUserId], references: [id], onDelete: SetNull)
+  lat        Float
+  lng        Float
+  accuracy   Float?
+  source     String
+  recordedAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  @@index([orderId, recordedAt])
+  @@index([riderUserId, recordedAt])
+}
+
+model OrderItem {
+  id        Int      @id @default(autoincrement())
+  order     Order    @relation(fields: [orderId], references: [id])
+  orderId   Int
+  product   Product  @relation(fields: [productId], references: [id])
+  productId Int
+  quantity  Int
+  price     Float
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Payment {
+  id             Int           @id @default(autoincrement())
+  order          Order         @relation(fields: [orderId], references: [id])
+  orderId        Int           @unique
+  paymentMethod  String
+  amount         Float
+  transactionId  String
+  paymentOrderId String
+  status         PaymentStatus
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  CANCELED
+}
+
+enum PaymentStatus {
+  WAITING
+  PAID
+  FAILED
+}
+
+enum UserRole {
+  BUYER
+  ADMIN
+}
+
+enum Category {
+  MEN
+  WOMEN
+  ACCESSORIES
+  SHOES
+  SALE
+  NEW
+}
