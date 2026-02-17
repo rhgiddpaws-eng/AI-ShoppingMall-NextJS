@@ -22,6 +22,7 @@ type LowStockProductRow = {
   stock: number
   category: string | null
 }
+type SalesDataPoint = { name: string; sales: number }
 
 // 매출 합계 계산을 공통화해 reduce 콜백 파라미터 타입 오류를 방지한다.
 function sumTotalAmount(rows: SalesOrderAmountRow[]): number {
@@ -41,38 +42,57 @@ function getPaidLikeOrderWhere(dateRange?: { gte: Date; lte: Date }) {
   }
 }
 
+// 날짜를 로컬 기준 일 단위 키(YYYY-MM-DD)로 맞춰 버킷 합산에 사용합니다.
+function formatDateKey(date: Date): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, "0")
+  const day = String(date.getDate()).padStart(2, "0")
+  return `${year}-${month}-${day}`
+}
+
+// 날짜를 로컬 기준 월 단위 키(YYYY-MM)로 맞춰 버킷 합산에 사용합니다.
+function formatMonthKey(date: Date): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, "0")
+  return `${year}-${month}`
+}
+
 /**
  * ?쇰퀎 留ㅼ텧 ?곗씠???앹꽦 (理쒓렐 30??
  */
 async function getDailySalesData() {
   const now = new Date()
-  const salesData = []
+  const salesData: SalesDataPoint[] = []
 
-  // 理쒓렐 30???곗씠???앹꽦
-  for (let i = 29; i >= 0; i--) {
+  // 30일 구간 전체를 한 번만 조회해 서버에서 날짜별 합계를 계산합니다.
+  const rangeStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29, 0, 0, 0)
+  const rangeEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59)
+  const orders = await prisma.order.findMany({
+    where: getPaidLikeOrderWhere({
+      gte: rangeStart,
+      lte: rangeEnd,
+    }),
+    select: {
+      totalAmount: true,
+      createdAt: true,
+    },
+  })
+  const salesByDay = new Map<string, number>()
+  for (const order of orders) {
+    const key = formatDateKey(order.createdAt)
+    salesByDay.set(key, (salesByDay.get(key) ?? 0) + order.totalAmount)
+  }
+
+  for (let i = 29; i >= 0; i -= 1) {
     const targetDate = new Date(now)
     targetDate.setDate(now.getDate() - i)
-
-    const startDate = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate(), 0, 0, 0)
-    const endDate = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate(), 23, 59, 59)
-
-    const orders = await prisma.order.findMany({
-      where: getPaidLikeOrderWhere({
-        gte: startDate,
-        lte: endDate,
-      }),
-      select: {
-        totalAmount: true,
-      },
-    })
-
-    const totalSales = sumTotalAmount(orders)
     const month = targetDate.getMonth() + 1
     const day = targetDate.getDate()
+    const key = formatDateKey(targetDate)
     salesData.push({
       name: `${month}/${day}`,
       // 인코딩 이슈를 피하기 위해 매출 값 키를 ASCII(sales)로 고정합니다.
-      sales: Math.round(totalSales),
+      sales: Math.round(salesByDay.get(key) ?? 0),
     })
   }
 
@@ -84,32 +104,36 @@ async function getDailySalesData() {
  */
 async function getMonthlySalesData() {
   const now = new Date()
-  const salesData = []
+  const salesData: SalesDataPoint[] = []
 
-  // 理쒓렐 12媛쒖썡 ?곗씠???앹꽦 (?꾩옱 ?붾?????닚?쇰줈)
-  for (let i = 11; i >= 0; i--) {
+  // 12개월 구간 전체를 한 번만 조회해 서버에서 월별 합계를 계산합니다.
+  const rangeStart = new Date(now.getFullYear(), now.getMonth() - 11, 1, 0, 0, 0)
+  const rangeEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59)
+  const orders = await prisma.order.findMany({
+    where: getPaidLikeOrderWhere({
+      gte: rangeStart,
+      lte: rangeEnd,
+    }),
+    select: {
+      totalAmount: true,
+      createdAt: true,
+    },
+  })
+  const salesByMonth = new Map<string, number>()
+  for (const order of orders) {
+    const key = formatMonthKey(order.createdAt)
+    salesByMonth.set(key, (salesByMonth.get(key) ?? 0) + order.totalAmount)
+  }
+
+  for (let i = 11; i >= 0; i -= 1) {
     const targetDate = new Date(now.getFullYear(), now.getMonth() - i, 1)
     const year = targetDate.getFullYear()
-    const month = targetDate.getMonth()
-
-    const startDate = new Date(year, month, 1, 0, 0, 0)
-    const endDate = new Date(year, month + 1, 0, 23, 59, 59)
-
-    const orders = await prisma.order.findMany({
-      where: getPaidLikeOrderWhere({
-        gte: startDate,
-        lte: endDate,
-      }),
-      select: {
-        totalAmount: true,
-      },
-    })
-
-    const totalSales = sumTotalAmount(orders)
+    const month = targetDate.getMonth() + 1
+    const key = formatMonthKey(targetDate)
     salesData.push({
-      name: `${year}.${String(month + 1).padStart(2, '0')}`,
+      name: `${year}.${String(month).padStart(2, "0")}`,
       // 인코딩 이슈를 피하기 위해 매출 값 키를 ASCII(sales)로 고정합니다.
-      sales: Math.round(totalSales),
+      sales: Math.round(salesByMonth.get(key) ?? 0),
     })
   }
 
@@ -122,28 +146,33 @@ async function getMonthlySalesData() {
 async function getYearlySalesData() {
   const now = new Date()
   const currentYear = now.getFullYear()
-  const salesData = []
+  const salesData: SalesDataPoint[] = []
 
-  for (let i = 4; i >= 0; i--) {
+  // 5년 구간 전체를 한 번만 조회해 서버에서 연도별 합계를 계산합니다.
+  const rangeStart = new Date(currentYear - 4, 0, 1, 0, 0, 0)
+  const rangeEnd = new Date(currentYear, 11, 31, 23, 59, 59)
+  const orders = await prisma.order.findMany({
+    where: getPaidLikeOrderWhere({
+      gte: rangeStart,
+      lte: rangeEnd,
+    }),
+    select: {
+      totalAmount: true,
+      createdAt: true,
+    },
+  })
+  const salesByYear = new Map<number, number>()
+  for (const order of orders) {
+    const year = order.createdAt.getFullYear()
+    salesByYear.set(year, (salesByYear.get(year) ?? 0) + order.totalAmount)
+  }
+
+  for (let i = 4; i >= 0; i -= 1) {
     const year = currentYear - i
-    const startDate = new Date(year, 0, 1, 0, 0, 0)
-    const endDate = new Date(year, 11, 31, 23, 59, 59)
-
-    const orders = await prisma.order.findMany({
-      where: getPaidLikeOrderWhere({
-        gte: startDate,
-        lte: endDate,
-      }),
-      select: {
-        totalAmount: true,
-      },
-    })
-
-    const totalSales = sumTotalAmount(orders)
     salesData.push({
       name: `${year}`,
       // 인코딩 이슈를 피하기 위해 매출 값 키를 ASCII(sales)로 고정합니다.
-      sales: Math.round(totalSales),
+      sales: Math.round(salesByYear.get(year) ?? 0),
     })
   }
 
@@ -166,145 +195,141 @@ async function getDashboardData(period: "week" | "month" | "year") {
   const lastMonthStart = new Date(currentYear, currentMonth - 1, 1, 0, 0, 0)
   const lastMonthEnd = new Date(currentYear, currentMonth, 0, 23, 59, 59)
 
-  // 珥??ъ슜????
-  const totalUsers = await prisma.user.count()
+  // 서로 독립적인 쿼리는 병렬 실행해 첫 로딩 시간을 줄입니다.
+  const salesDataPromise =
+    period === "week"
+      ? getDailySalesData()
+      : period === "month"
+        ? getMonthlySalesData()
+        : getYearlySalesData()
 
-  // ?대쾲 ???좉퇋 媛?낆옄
-  const newUsersThisMonth = await prisma.user.count({
-    where: {
-      createdAt: {
-        gte: thisMonthStart,
-        lte: thisMonthEnd,
-      },
-    },
-  })
-
-  // 吏?????좉퇋 媛?낆옄
-  const newUsersLastMonth = await prisma.user.count({
-    where: {
-      createdAt: {
-        gte: lastMonthStart,
-        lte: lastMonthEnd,
-      },
-    },
-  })
-
-  // ?대쾲 ??留ㅼ텧
-  const thisMonthOrders = await prisma.order.findMany({
-    where: getPaidLikeOrderWhere({
-      gte: thisMonthStart,
-      lte: thisMonthEnd,
-    }),
-    select: {
-      totalAmount: true,
-    },
-  })
-  const monthlyRevenue = sumTotalAmount(thisMonthOrders)
-
-  // 吏????留ㅼ텧
-  const lastMonthOrders = await prisma.order.findMany({
-    where: getPaidLikeOrderWhere({
-      gte: lastMonthStart,
-      lte: lastMonthEnd,
-    }),
-    select: {
-      totalAmount: true,
-    },
-  })
-  const lastMonthRevenue = sumTotalAmount(lastMonthOrders)
-
-  // 珥?二쇰Ц 嫄댁닔
-  const totalOrders = await prisma.order.count()
-
-  // ?대쾲 ??二쇰Ц 嫄댁닔
-  const ordersThisMonth = await prisma.order.count({
-    where: {
-      createdAt: {
-        gte: thisMonthStart,
-        lte: thisMonthEnd,
-      },
-    },
-  })
-
-  // 吏????二쇰Ц 嫄댁닔
-  const ordersLastMonth = await prisma.order.count({
-    where: {
-      createdAt: {
-        gte: lastMonthStart,
-        lte: lastMonthEnd,
-      },
-    },
-  })
-
-  // ?ш퀬 遺議??곹뭹 (?ш퀬 5媛??댄븯)
-  const lowStockProducts = await prisma.product.count({
-    where: {
-      stock: {
-        lte: 5,
-      },
-    },
-  })
-
-  // 二쇰Ц ?곹깭蹂?嫄댁닔
-  const pendingOrders = await prisma.order.count({ where: { status: "PENDING" } })
-  const paidOrders = await prisma.order.count({ where: getPaidLikeOrderWhere() })
-  const canceledOrders = await prisma.order.count({ where: { status: "CANCELED" } })
-
-  // 諛곗넚 ?곹깭蹂?嫄댁닔 (PAID 二쇰Ц 以?
-  const preparingOrders = await prisma.order.count({
-    where: { ...getPaidLikeOrderWhere(), deliveryStatus: "PREPARING" },
-  })
-  const inDeliveryOrders = await prisma.order.count({
-    where: { ...getPaidLikeOrderWhere(), deliveryStatus: "IN_DELIVERY" },
-  })
-  const deliveredOrders = await prisma.order.count({
-    where: { ...getPaidLikeOrderWhere(), deliveryStatus: "DELIVERED" },
-  })
-
-  // 理쒓렐 二쇰Ц 5媛?
-  const recentOrders = await prisma.order.findMany({
-    take: 5,
-    orderBy: {
-      createdAt: "desc",
-    },
-    include: {
-      user: {
-        select: {
-          name: true,
-          email: true,
+  const [
+    totalUsers,
+    newUsersThisMonth,
+    newUsersLastMonth,
+    thisMonthRevenueAgg,
+    lastMonthRevenueAgg,
+    totalOrders,
+    ordersThisMonth,
+    ordersLastMonth,
+    lowStockProducts,
+    pendingOrders,
+    paidOrders,
+    canceledOrders,
+    preparingOrders,
+    inDeliveryOrders,
+    deliveredOrders,
+    recentOrders,
+    lowStockProductsList,
+    salesData,
+  ] = await Promise.all([
+    prisma.user.count(),
+    prisma.user.count({
+      where: {
+        createdAt: {
+          gte: thisMonthStart,
+          lte: thisMonthEnd,
         },
       },
-    },
-  })
-
-  // ?ш퀬 遺議??곹뭹 紐⑸줉
-  const lowStockProductsList = await prisma.product.findMany({
-    where: {
-      stock: {
-        lte: 5,
+    }),
+    prisma.user.count({
+      where: {
+        createdAt: {
+          gte: lastMonthStart,
+          lte: lastMonthEnd,
+        },
       },
-    },
-    take: 5,
-    orderBy: {
-      stock: "asc",
-    },
-    select: {
-      id: true,
-      name: true,
-      stock: true,
-      category: true,
-    },
-  })
-
-  // 湲곌컙蹂?留ㅼ텧 ?곗씠??
-  let salesData
-  if (period === "week") {
-    salesData = await getDailySalesData()
-  } else if (period === "month") {
-    salesData = await getMonthlySalesData()
-  } else {
-    salesData = await getYearlySalesData()
-  }
+    }),
+    prisma.order.aggregate({
+      where: getPaidLikeOrderWhere({
+        gte: thisMonthStart,
+        lte: thisMonthEnd,
+      }),
+      _sum: {
+        totalAmount: true,
+      },
+    }),
+    prisma.order.aggregate({
+      where: getPaidLikeOrderWhere({
+        gte: lastMonthStart,
+        lte: lastMonthEnd,
+      }),
+      _sum: {
+        totalAmount: true,
+      },
+    }),
+    prisma.order.count(),
+    prisma.order.count({
+      where: {
+        createdAt: {
+          gte: thisMonthStart,
+          lte: thisMonthEnd,
+        },
+      },
+    }),
+    prisma.order.count({
+      where: {
+        createdAt: {
+          gte: lastMonthStart,
+          lte: lastMonthEnd,
+        },
+      },
+    }),
+    prisma.product.count({
+      where: {
+        stock: {
+          lte: 5,
+        },
+      },
+    }),
+    prisma.order.count({ where: { status: "PENDING" } }),
+    prisma.order.count({ where: getPaidLikeOrderWhere() }),
+    prisma.order.count({ where: { status: "CANCELED" } }),
+    prisma.order.count({
+      where: { ...getPaidLikeOrderWhere(), deliveryStatus: "PREPARING" },
+    }),
+    prisma.order.count({
+      where: { ...getPaidLikeOrderWhere(), deliveryStatus: "IN_DELIVERY" },
+    }),
+    prisma.order.count({
+      where: { ...getPaidLikeOrderWhere(), deliveryStatus: "DELIVERED" },
+    }),
+    prisma.order.findMany({
+      take: 5,
+      orderBy: {
+        createdAt: "desc",
+      },
+      include: {
+        user: {
+          select: {
+            name: true,
+            email: true,
+          },
+        },
+      },
+    }),
+    prisma.product.findMany({
+      where: {
+        stock: {
+          lte: 5,
+        },
+      },
+      // 스크롤 목록에서 충분히 확인할 수 있도록 노출 개수를 늘립니다.
+      take: 30,
+      orderBy: {
+        stock: "asc",
+      },
+      select: {
+        id: true,
+        name: true,
+        stock: true,
+        category: true,
+      },
+    }),
+    salesDataPromise,
+  ])
+  const monthlyRevenue = thisMonthRevenueAgg._sum.totalAmount ?? 0
+  const lastMonthRevenue = lastMonthRevenueAgg._sum.totalAmount ?? 0
 
   // ?몃젋??怨꾩궛
   const userTrend = newUsersLastMonth > 0
@@ -318,6 +343,7 @@ async function getDashboardData(period: "week" | "month" | "year") {
     : 0
 
   return {
+    period,
     stats: {
       totalUsers,
       newUsersThisMonth,
@@ -349,12 +375,12 @@ async function getDashboardData(period: "week" | "month" | "year") {
       // 관리자 대시보드에서 사용하는 주문 상태 라벨을 안전한 문자열로 고정한다.
       status:
         order.deliveryStatus === "DELIVERED"
-          ? "Delivered"
+          ? "배송 완료"
           : order.deliveryStatus === "IN_DELIVERY"
-            ? "In delivery"
+            ? "배송 중"
             : order.status === "PAID"
-              ? "Paid"
-              : "Pending",
+              ? "결제 완료"
+              : "결제 대기",
       amount: Math.round(order.totalAmount),
     })),
     // 동일한 이유로 재고 목록 매핑도 콜백 타입을 명시한다.

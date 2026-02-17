@@ -4,7 +4,7 @@
 // 통계 카드(사용자/매출/주문/재고), 매출 추이 차트, 주문 상태, 최근 주문/재고 부족 상품
 // =============================================================================
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Users, CreditCard, Package, ShoppingCart } from "lucide-react"
 import { DashboardCard } from "@/components/admin/dashboard-card"
 import { SalesChartUplot } from "@/components/admin/sales-chart-uplot"
@@ -16,34 +16,100 @@ import { Badge } from "@/components/ui/badge"
 /** 탭 값: 일(일별) / 월(월별) / 년(연별) — API period와 명시적 매핑 */
 const TAB_TO_API_PERIOD = { 일: "week", 월: "month", 년: "year" } as const
 type TabPeriod = keyof typeof TAB_TO_API_PERIOD
+type ApiPeriod = (typeof TAB_TO_API_PERIOD)[TabPeriod]
+
+type DashboardData = {
+  period: ApiPeriod
+  stats: {
+    totalUsers: number
+    newUsersThisMonth: number
+    monthlyRevenue: number
+    totalOrders: number
+    ordersThisMonth: number
+    lowStockProducts: number
+  }
+  trends: {
+    users: { value: number; isPositive: boolean }
+    revenue: { value: number; isPositive: boolean }
+    orders: { value: number; isPositive: boolean }
+    lowStock: { value: number; isPositive: boolean }
+  }
+  salesData: Array<{ name: string; sales?: number; 매출?: number; "留ㅼ텧"?: number }>
+  orderStatus: {
+    pending: number
+    confirmed: number
+    shipping: number
+    delivered: number
+    refundRequests: number
+    exchangeRequests: number
+  }
+  recentOrders: Array<{
+    id: string
+    customer: string
+    date: string
+    status: "결제 대기" | "결제 완료" | "배송 중" | "배송 완료"
+    amount: number
+  }>
+  lowStockProducts: Array<{
+    id: string
+    name: string
+    stock: number
+    category: string
+  }>
+}
 
 /** 관리자 대시보드: /api/admin/dashboard 데이터로 통계·차트·최근 주문·재고 부족 표시 */
 export default function AdminDashboard() {
   const [tabPeriod, setTabPeriod] = useState<TabPeriod>("월")
   const apiPeriod = TAB_TO_API_PERIOD[tabPeriod]
-  const [dashboardData, setDashboardData] = useState<any>(null)
+  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [isPeriodLoading, setIsPeriodLoading] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const latestRequestIdRef = useRef(0)
 
   useEffect(() => {
+    const controller = new AbortController()
+    const requestId = latestRequestIdRef.current + 1
+    latestRequestIdRef.current = requestId
     const isInitialLoad = dashboardData == null
-    if (isInitialLoad) setLoading(true)
+    setLoadError(null)
+    if (isInitialLoad) {
+      setLoading(true)
+    } else {
+      setIsPeriodLoading(true)
+    }
 
     const fetchDashboardData = async () => {
       try {
-        const response = await fetch(`/api/admin/dashboard?period=${apiPeriod}`, { cache: "no-store" })
+        const response = await fetch(`/api/admin/dashboard?period=${apiPeriod}`, {
+          cache: "no-store",
+          signal: controller.signal,
+        })
         if (!response.ok) {
           throw new Error("데이터를 불러오는데 실패했습니다")
         }
-        const data = await response.json()
+        const data = (await response.json()) as DashboardData
+        // 더 최신 탭 요청이 이미 시작된 경우 구 응답은 버려서 화면 역전(race)을 방지합니다.
+        if (latestRequestIdRef.current !== requestId) return
         setDashboardData(data)
       } catch (error) {
+        // 탭 전환으로 인한 취소 에러는 정상 흐름이므로 무시합니다.
+        if (error instanceof DOMException && error.name === "AbortError") return
+        if (latestRequestIdRef.current !== requestId) return
         console.error("대시보드 데이터 로딩 오류:", error)
+        setLoadError("대시보드 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.")
       } finally {
+        if (latestRequestIdRef.current !== requestId) return
         setLoading(false)
+        setIsPeriodLoading(false)
       }
     }
 
-    fetchDashboardData()
+    void fetchDashboardData()
+    return () => {
+      controller.abort()
+    }
   }, [apiPeriod])
 
   if (loading) {
@@ -58,7 +124,7 @@ export default function AdminDashboard() {
     return (
       <div className="text-center py-10">
         <h2 className="text-xl font-semibold">데이터를 불러올 수 없습니다</h2>
-        <p className="text-muted-foreground mt-2">잠시 후 다시 시도해주세요.</p>
+        <p className="text-muted-foreground mt-2">{loadError ?? "잠시 후 다시 시도해주세요."}</p>
       </div>
     )
   }
@@ -76,11 +142,15 @@ export default function AdminDashboard() {
             <div className="flex items-center gap-2 pt-1">
               <Tabs value={tabPeriod} onValueChange={(v) => setTabPeriod(v as TabPeriod)}>
                 <TabsList className="h-9">
-                  <TabsTrigger value="일">일</TabsTrigger>
-                  <TabsTrigger value="월">월</TabsTrigger>
-                  <TabsTrigger value="년">년</TabsTrigger>
+                  {/* 탭 전환 중 중복 요청을 줄이기 위해 잠깐 비활성화합니다. */}
+                  <TabsTrigger value="일" disabled={isPeriodLoading}>일</TabsTrigger>
+                  <TabsTrigger value="월" disabled={isPeriodLoading}>월</TabsTrigger>
+                  <TabsTrigger value="년" disabled={isPeriodLoading}>년</TabsTrigger>
                 </TabsList>
               </Tabs>
+              {isPeriodLoading ? (
+                <span className="text-xs text-muted-foreground">데이터 갱신 중...</span>
+              ) : null}
             </div>
           </CardHeader>
           <CardContent>
@@ -89,47 +159,88 @@ export default function AdminDashboard() {
             </div>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle>최근 주문</CardTitle>
-              <CardDescription>최근 5개 주문</CardDescription>
-            </div>
-            <Button variant="outline" size="sm">
-              모두 보기
-            </Button>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {dashboardData.recentOrders.map((order: any) => (
-                <div key={order.id} className="flex items-center justify-between border-b pb-2">
-                  <div>
-                    <div className="font-medium">{order.id}</div>
-                    <div className="text-sm text-muted-foreground">
-                      {order.customer} • {order.date}
+        {/* 최근 주문 폭을 절반으로 줄이고, 우측에는 재고 부족 상품 리스트를 스크롤로 배치합니다. */}
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>최근 주문</CardTitle>
+                <CardDescription>최근 5개 주문</CardDescription>
+              </div>
+              <Button variant="outline" size="sm">
+                모두 보기
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <div className="max-h-[340px] overflow-y-auto pr-2 space-y-4">
+                {dashboardData.recentOrders.map((order) => (
+                  <div key={order.id} className="flex items-center justify-between border-b pb-2">
+                    <div>
+                      <div className="font-medium">{order.id}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {order.customer} • {order.date}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge
+                        variant={
+                          order.status === "배송 완료"
+                            ? "default"
+                            : order.status === "배송 중"
+                              ? "secondary"
+                              : order.status === "결제 완료"
+                                ? "outline"
+                                : "destructive"
+                        }
+                      >
+                        {order.status}
+                      </Badge>
+                      <div className="font-medium">{order.amount.toLocaleString()}원</div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Badge
-                      variant={
-                        order.status === "배송 완료"
-                          ? "default"
-                          : order.status === "배송 중"
-                            ? "secondary"
-                            : order.status === "결제 완료"
-                              ? "outline"
-                              : "destructive"
-                      }
-                    >
-                      {order.status}
-                    </Badge>
-                    <div className="font-medium">{order.amount.toLocaleString()}원</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>재고 부족 상품</CardTitle>
+                <CardDescription>재고가 5개 이하인 상품</CardDescription>
+              </div>
+              <Button variant="outline" size="sm">
+                모두 보기
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <div className="max-h-[340px] overflow-y-auto pr-2 space-y-3">
+                {dashboardData.lowStockProducts.length === 0 ? (
+                  <div className="text-sm text-muted-foreground">재고 부족 상품이 없습니다.</div>
+                ) : (
+                  dashboardData.lowStockProducts.map((product) => (
+                    <div key={product.id} className="flex items-center justify-between border-b pb-2">
+                      <div>
+                        <div className="font-medium">{product.name}</div>
+                        <div className="text-sm text-muted-foreground">
+                          {product.category} • {product.id}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant={product.stock <= 3 ? "destructive" : "outline"}>
+                          재고: {product.stock}개
+                        </Badge>
+                        <Button size="sm" variant="ghost">
+                          <Package className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
@@ -163,8 +274,8 @@ export default function AdminDashboard() {
         />
       </div>
 
-      {/* 주문 상태 | 재고 부족 상품 — 위칸에 배치해 빈칸 없음 */}
-      <div className="grid gap-4 md:grid-cols-2 mb-6">
+      {/* 재고 부족 상품 카드를 위로 이동했으므로 주문 상태 카드는 단독 배치합니다. */}
+      <div className="mb-6">
         <Card>
           <CardHeader>
             <CardTitle>주문 상태</CardTitle>
@@ -198,38 +309,6 @@ export default function AdminDashboard() {
                 <div className="text-sm font-medium">교환 요청</div>
                 <Badge variant="secondary">{dashboardData.orderStatus.exchangeRequests}건</Badge>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle>재고 부족 상품</CardTitle>
-              <CardDescription>재고가 5개 이하인 상품</CardDescription>
-            </div>
-            <Button variant="outline" size="sm">
-              모두 보기
-            </Button>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {dashboardData.lowStockProducts.map((product: any) => (
-                <div key={product.id} className="flex items-center justify-between border-b pb-2">
-                  <div>
-                    <div className="font-medium">{product.name}</div>
-                    <div className="text-sm text-muted-foreground">
-                      {product.category} • {product.id}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant={product.stock <= 3 ? "destructive" : "outline"}>재고: {product.stock}개</Badge>
-                    <Button size="sm" variant="ghost">
-                      <Package className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
             </div>
           </CardContent>
         </Card>
