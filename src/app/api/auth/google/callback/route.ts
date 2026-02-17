@@ -13,21 +13,24 @@ const USERINFO_URL = 'https://www.googleapis.com/oauth2/v2/userinfo'
 
 export async function GET(request: NextRequest) {
   const code = request.nextUrl.searchParams.get('code')
-  const origin = request.nextUrl.origin
-  const loginPath = `${origin}/login`
-  const successRedirect = `${origin}/login?oauth=success`
+  // 로그인 시작 라우트와 동일하게 NEXT_PUBLIC_APP_URL 우선 사용으로 도메인 불일치를 줄입니다.
+  const appBaseUrl = process.env.NEXT_PUBLIC_APP_URL?.trim() || request.nextUrl.origin
+  const normalizedBaseUrl = appBaseUrl.replace(/\/$/, '')
+  const loginPath = `${normalizedBaseUrl}/login`
+  const successRedirect = `${normalizedBaseUrl}/login?oauth=success`
 
   if (!code) {
     return NextResponse.redirect(new URL(`${loginPath}?error=no_code`, request.url))
   }
 
-  const clientId = process.env.GOOGLE_CLIENT_ID
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET
+  // 배포 환경에서 환경변수 끝 공백/개행으로 OAuth가 깨지는 문제를 방지합니다.
+  const clientId = process.env.GOOGLE_CLIENT_ID?.trim()
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET?.trim()
   if (!clientId || !clientSecret) {
     return NextResponse.redirect(new URL(`${loginPath}?error=config`, request.url))
   }
 
-  const redirectUri = `${origin}/api/auth/google/callback`
+  const redirectUri = `${normalizedBaseUrl}/api/auth/google/callback`
   const tokenRes = await fetch(TOKEN_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },

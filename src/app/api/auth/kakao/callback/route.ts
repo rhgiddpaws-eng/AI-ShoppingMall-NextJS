@@ -20,22 +20,24 @@ type KakaoProfile = {
 
 export async function GET(request: NextRequest) {
   const code = request.nextUrl.searchParams.get('code')
-  const origin = request.nextUrl.origin
-  const loginPath = `${origin}/login`
-  const successRedirect = `${origin}/login?oauth=success`
+  // 로그인 시작 라우트와 동일하게 NEXT_PUBLIC_APP_URL 우선 사용으로 도메인 불일치를 줄입니다.
+  const appBaseUrl = process.env.NEXT_PUBLIC_APP_URL?.trim() || request.nextUrl.origin
+  const normalizedBaseUrl = appBaseUrl.replace(/\/$/, '')
+  const loginPath = `${normalizedBaseUrl}/login`
+  const successRedirect = `${normalizedBaseUrl}/login?oauth=success`
 
   if (!code) {
     return NextResponse.redirect(new URL(`${loginPath}?error=no_code`, request.url))
   }
 
-  // 카카오 OAuth client_id는 REST API 키 변수 하나만 사용한다.
-  const clientId = process.env.KAKAO_REST_API_KEY
-  const clientSecret = process.env.KAKAO_CLIENT_SECRET ?? ''
+  // 배포 환경에서 환경변수 끝 공백/개행으로 OAuth 파라미터가 깨지는 문제를 방지합니다.
+  const clientId = process.env.KAKAO_REST_API_KEY?.trim()
+  const clientSecret = process.env.KAKAO_CLIENT_SECRET?.trim() ?? ''
   if (!clientId) {
     return NextResponse.redirect(new URL(`${loginPath}?error=config`, request.url))
   }
 
-  const redirectUri = `${origin}/api/auth/kakao/callback`
+  const redirectUri = `${normalizedBaseUrl}/api/auth/kakao/callback`
   // 카카오 Client Secret을 켠 환경에서만 client_secret을 보내고, 비활성 환경에서는 제외합니다.
   // 이렇게 하면 Secret을 끈 앱에서 빈 문자열로 인한 토큰 교환 실패를 예방할 수 있습니다.
   const tokenParams = new URLSearchParams({

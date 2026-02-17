@@ -5,19 +5,19 @@ import { useState } from "react"
 import { SalesChartUplot } from "@/components/admin/sales-chart-uplot"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
-const MOCK_MONTH: { name: string; 매출: number }[] = [
-  { name: "2025.03", 매출: 7360000 },
-  { name: "2025.04", 매출: 8120000 },
-  { name: "2025.05", 매출: 5470000 },
-  { name: "2025.06", 매출: 7960000 },
-  { name: "2025.07", 매출: 7360000 },
-  { name: "2025.08", 매출: 7970000 },
-  { name: "2025.09", 매출: 7810000 },
-  { name: "2025.10", 매출: 11380000 },
-  { name: "2025.11", 매출: 8400000 },
-  { name: "2025.12", 매출: 8740000 },
-  { name: "2026.01", 매출: 9380000 },
-  { name: "2026.02", 매출: 50130000 },
+const MOCK_MONTH: { name: string; sales: number }[] = [
+  { name: "2025.03", sales: 7360000 },
+  { name: "2025.04", sales: 8120000 },
+  { name: "2025.05", sales: 5470000 },
+  { name: "2025.06", sales: 7960000 },
+  { name: "2025.07", sales: 7360000 },
+  { name: "2025.08", sales: 7970000 },
+  { name: "2025.09", sales: 7810000 },
+  { name: "2025.10", sales: 11380000 },
+  { name: "2025.11", sales: 8400000 },
+  { name: "2025.12", sales: 8740000 },
+  { name: "2026.01", sales: 9380000 },
+  { name: "2026.02", sales: 50130000 },
 ]
 
 export default function DevChartPage() {

@@ -93,13 +93,15 @@ export async function POST(req: Request) {
 
     // 데이터베이스 트랜잭션 처리
     // TS 버전 차이로 인한 implicit any를 막기 위해 트랜잭션 클라이언트 타입을 명시합니다.
-    const createdOrder = await prismaClient.$transaction(async (prisma: any) => {
+    await prismaClient.$transaction(async (prisma: any) => {
       try {
+        // 토스 승인(status=DONE)이 끝난 시점이므로 주문/결제 상태를 즉시 PAID로 저장합니다.
+        // 웹훅 지연/누락이 있어도 관리자 통계와 주문 이력이 즉시 일관되게 보이도록 합니다.
         // 주문 생성
         const order = await prisma.order.create({
           data: {
             totalAmount: +amount,
-            status: OrderStatus.PENDING,
+            status: OrderStatus.PAID,
             userId: auth.id,
             shippingAddress: shippingAddress || null,
             shippingLat: geocodedShipping?.lat ?? null,
@@ -117,7 +119,7 @@ export async function POST(req: Request) {
                 amount: result.suppliedAmount,
                 transactionId: result.paymentKey,
                 paymentOrderId: result.orderId,
-                status: PaymentStatus.WAITING,
+                status: PaymentStatus.PAID,
               },
             },
           },

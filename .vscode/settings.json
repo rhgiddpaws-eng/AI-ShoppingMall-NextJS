@@ -1,0 +1,8 @@
+{
+  // 에디터 저장 인코딩을 UTF-8로 고정해서 한글 깨짐을 예방합니다.
+  "files.encoding": "utf8",
+  // 자동 인코딩 추측을 끄고, 파일마다 인코딩이 바뀌는 상황을 막습니다.
+  "files.autoGuessEncoding": false,
+  // 프로젝트 줄바꿈 기준을 LF로 고정합니다.
+  "files.eol": "\n"
+}

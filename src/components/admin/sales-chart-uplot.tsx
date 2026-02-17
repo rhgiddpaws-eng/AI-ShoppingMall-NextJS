@@ -1,7 +1,7 @@
 "use client"
 /**
  * 매출 추이 막대 차트 — uPlot 사용 (경량·고성능)
- * salesData: { name: string, 매출: number }[]
+ * salesData: { name: string, sales: number }[]
  * period: "week" | "month" | "year" - 기간별로 다른 렌더링
  */
 
@@ -10,7 +10,18 @@ import "uplot/dist/uPlot.min.css"
 
 interface SalesDatum {
   name: string
-  매출: number
+  // 서버 인코딩 이슈/과거 데이터와 호환되도록 매출 키를 여러 형태로 읽습니다.
+  sales?: number
+  매출?: number
+  "留ㅼ텧"?: number
+}
+
+// sales(신규) → 매출(구버전) → 깨진 키(레거시) 순서로 읽어 배포 전후 데이터를 모두 지원합니다.
+const getSalesAmount = (datum: SalesDatum): number => {
+  if (typeof datum.sales === "number" && Number.isFinite(datum.sales)) return datum.sales
+  if (typeof datum.매출 === "number" && Number.isFinite(datum.매출)) return datum.매출
+  if (typeof datum["留ㅼ텧"] === "number" && Number.isFinite(datum["留ㅼ텧"])) return datum["留ㅼ텧"]
+  return 0
 }
 
 export function SalesChartUplot({
@@ -58,7 +69,7 @@ export function SalesChartUplot({
     }
 
     const xData = data.map((_, i) => i)
-    const yData = data.map((d) => d.매출)
+    const yData = data.map((d) => getSalesAmount(d))
 
     const load = async () => {
       if (!containerRef.current) return // 컴포넌트가 언마운트되었을 수 있음
@@ -161,7 +172,7 @@ export function SalesChartUplot({
               const hoveredIdx = hoveredIdxRef.current
               for (let i = 0; i < data.length; i++) {
                 const xVal = u.valToPos(i, "x", true)
-                const yVal = u.valToPos(data[i].매출, "y", true)
+                const yVal = u.valToPos(getSalesAmount(data[i]), "y", true)
                 const yZero = u.valToPos(0, "y", true)
 
                 if (xVal != null && yVal != null && yZero != null) {
@@ -192,7 +203,7 @@ export function SalesChartUplot({
 
               data.forEach((d, i) => {
                 const xVal = u.valToPos(i, "x", true)
-                const yVal = u.valToPos(d.매출, "y", true)
+                const yVal = u.valToPos(getSalesAmount(d), "y", true)
 
                 if (xVal != null && yVal != null) {
                   if (firstPoint) {
@@ -212,7 +223,7 @@ export function SalesChartUplot({
 
               data.forEach((d, i) => {
                 const xVal = u.valToPos(i, "x", true)
-                const yVal = u.valToPos(d.매출, "y", true)
+                const yVal = u.valToPos(getSalesAmount(d), "y", true)
                 if (xVal != null && yVal != null) {
                   ctx.beginPath()
                   ctx.arc(xVal, yVal, 3, 0, 2 * Math.PI)
@@ -227,8 +238,8 @@ export function SalesChartUplot({
               if (hoveredIdx != null && hoveredIdx >= 0 && hoveredIdx < data.length) {
                 const i = hoveredIdx
                 const xVal = u.valToPos(i, "x", true)
-                const yVal = u.valToPos(data[i].매출, "y", true)
-                const v = data[i].매출
+                const yVal = u.valToPos(getSalesAmount(data[i]), "y", true)
+                const v = getSalesAmount(data[i])
 
                 if (xVal != null && yVal != null) {
                   ctx.save()
@@ -290,7 +301,7 @@ export function SalesChartUplot({
 
         if (idx >= 0 && idx < data.length) {
           const datum = data[idx]
-          const salesVal = datum?.매출 ?? 0
+          const salesVal = datum ? getSalesAmount(datum) : 0
           const periodLabel = getPeriodLabel()
           // 형식: "년/월/일 매출 : 금액 원"
           hoverInfo.textContent = `${datum.name} ${periodLabel} 매출 : ${formatAmount(salesVal)}`

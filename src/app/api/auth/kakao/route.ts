@@ -12,12 +12,15 @@ const SCOPE = 'profile_nickname'
 
 export async function GET(request: NextRequest) {
   // 카카오 OAuth client_id는 REST API 키 변수 하나만 사용한다.
-  const clientId = process.env.KAKAO_REST_API_KEY
+  // 배포 환경에서 환경변수 끝 공백/개행으로 client_id가 오염되는 문제를 방지합니다.
+  const clientId = process.env.KAKAO_REST_API_KEY?.trim()
   if (!clientId) {
     return NextResponse.json({ error: 'Kakao OAuth not configured' }, { status: 503 })
   }
-  const origin = request.nextUrl.origin
-  const redirectUri = `${origin}/api/auth/kakao/callback`
+  // 운영 도메인을 고정하고 싶을 때 NEXT_PUBLIC_APP_URL을 우선 사용해 redirect_uri 불일치를 줄입니다.
+  const appBaseUrl = process.env.NEXT_PUBLIC_APP_URL?.trim() || request.nextUrl.origin
+  const normalizedBaseUrl = appBaseUrl.replace(/\/$/, '')
+  const redirectUri = `${normalizedBaseUrl}/api/auth/kakao/callback`
   const params = new URLSearchParams({
     client_id: clientId,
     redirect_uri: redirectUri,

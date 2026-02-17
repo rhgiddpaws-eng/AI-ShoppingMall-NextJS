@@ -1,0 +1,23 @@
+# 한글이 깨지지 않도록 기본 텍스트 파일은 LF + UTF-8 기준으로 관리합니다.
+* text=auto
+
+# 소스/문서 파일은 줄바꿈을 LF로 고정해 환경별 차이를 줄입니다.
+*.js text eol=lf working-tree-encoding=UTF-8
+*.jsx text eol=lf working-tree-encoding=UTF-8
+*.ts text eol=lf working-tree-encoding=UTF-8
+*.tsx text eol=lf working-tree-encoding=UTF-8
+*.mjs text eol=lf working-tree-encoding=UTF-8
+*.cjs text eol=lf working-tree-encoding=UTF-8
+*.json text eol=lf working-tree-encoding=UTF-8
+*.css text eol=lf working-tree-encoding=UTF-8
+*.scss text eol=lf working-tree-encoding=UTF-8
+*.md text eol=lf working-tree-encoding=UTF-8
+*.mdx text eol=lf working-tree-encoding=UTF-8
+*.yml text eol=lf working-tree-encoding=UTF-8
+*.yaml text eol=lf working-tree-encoding=UTF-8
+*.txt text eol=lf working-tree-encoding=UTF-8
+
+# Windows 스크립트는 실행 환경 특성상 CRLF를 유지합니다.
+*.ps1 text eol=crlf working-tree-encoding=UTF-8
+*.bat text eol=crlf working-tree-encoding=UTF-8
+*.cmd text eol=crlf working-tree-encoding=UTF-8

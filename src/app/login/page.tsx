@@ -143,16 +143,18 @@ export default function LoginPage() {
 
       <div className="space-y-4">
         <Button variant="outline" className="w-full" asChild>
-          <Link href="/api/auth/google">
+          {/* OAuth 시작 API는 페이지 prefetch 대상이 아니므로 a 태그로 이동해 CORS 콘솔 오류를 예방합니다. */}
+          <a href="/api/auth/google">
             <Google className="mr-2 h-4 w-4" />
             Google로 로그인
-          </Link>
+          </a>
         </Button>
         <Button variant="outline" className="w-full" asChild>
-          <Link href="/api/auth/kakao">
+          {/* OAuth 시작 API는 페이지 prefetch 대상이 아니므로 a 태그로 이동해 CORS 콘솔 오류를 예방합니다. */}
+          <a href="/api/auth/kakao">
             <MessageCircle className="mr-2 h-4 w-4" />
             카카오로 로그인
-          </Link>
+          </a>
         </Button>
       </div>
 

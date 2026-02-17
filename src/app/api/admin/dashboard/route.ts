@@ -28,6 +28,19 @@ function sumTotalAmount(rows: SalesOrderAmountRow[]): number {
   return rows.reduce((sum: number, row: SalesOrderAmountRow) => sum + row.totalAmount, 0)
 }
 
+// 과거 결제 라우트 버그로 주문/결제 상태가 PENDING/WAITING으로 남은 데이터도
+// 관리자 매출 통계에서 누락되지 않도록 "실결제 완료로 간주할 조건"을 공통화합니다.
+function getPaidLikeOrderWhere(dateRange?: { gte: Date; lte: Date }) {
+  return {
+    ...(dateRange ? { createdAt: dateRange } : {}),
+    OR: [
+      { status: "PAID" as const },
+      { payment: { is: { status: "PAID" as const } } },
+      { payment: { is: { status: "WAITING" as const } } },
+    ],
+  }
+}
+
 /**
  * ?쇰퀎 留ㅼ텧 ?곗씠???앹꽦 (理쒓렐 30??
  */
@@ -44,13 +57,10 @@ async function getDailySalesData() {
     const endDate = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate(), 23, 59, 59)
 
     const orders = await prisma.order.findMany({
-      where: {
-        status: "PAID",
-        createdAt: {
-          gte: startDate,
-          lte: endDate,
-        },
-      },
+      where: getPaidLikeOrderWhere({
+        gte: startDate,
+        lte: endDate,
+      }),
       select: {
         totalAmount: true,
       },
@@ -61,7 +71,8 @@ async function getDailySalesData() {
     const day = targetDate.getDate()
     salesData.push({
       name: `${month}/${day}`,
-      留ㅼ텧: Math.round(totalSales),
+      // 인코딩 이슈를 피하기 위해 매출 값 키를 ASCII(sales)로 고정합니다.
+      sales: Math.round(totalSales),
     })
   }
 
@@ -85,13 +96,10 @@ async function getMonthlySalesData() {
     const endDate = new Date(year, month + 1, 0, 23, 59, 59)
 
     const orders = await prisma.order.findMany({
-      where: {
-        status: "PAID",
-        createdAt: {
-          gte: startDate,
-          lte: endDate,
-        },
-      },
+      where: getPaidLikeOrderWhere({
+        gte: startDate,
+        lte: endDate,
+      }),
       select: {
         totalAmount: true,
       },
@@ -100,7 +108,8 @@ async function getMonthlySalesData() {
     const totalSales = sumTotalAmount(orders)
     salesData.push({
       name: `${year}.${String(month + 1).padStart(2, '0')}`,
-      留ㅼ텧: Math.round(totalSales),
+      // 인코딩 이슈를 피하기 위해 매출 값 키를 ASCII(sales)로 고정합니다.
+      sales: Math.round(totalSales),
     })
   }
 
@@ -121,13 +130,10 @@ async function getYearlySalesData() {
     const endDate = new Date(year, 11, 31, 23, 59, 59)
 
     const orders = await prisma.order.findMany({
-      where: {
-        status: "PAID",
-        createdAt: {
-          gte: startDate,
-          lte: endDate,
-        },
-      },
+      where: getPaidLikeOrderWhere({
+        gte: startDate,
+        lte: endDate,
+      }),
       select: {
         totalAmount: true,
       },
@@ -136,7 +142,8 @@ async function getYearlySalesData() {
     const totalSales = sumTotalAmount(orders)
     salesData.push({
       name: `${year}`,
-      留ㅼ텧: Math.round(totalSales),
+      // 인코딩 이슈를 피하기 위해 매출 값 키를 ASCII(sales)로 고정합니다.
+      sales: Math.round(totalSales),
     })
   }
 
@@ -184,13 +191,10 @@ async function getDashboardData(period: "week" | "month" | "year") {
 
   // ?대쾲 ??留ㅼ텧
   const thisMonthOrders = await prisma.order.findMany({
-    where: {
-      status: "PAID",
-      createdAt: {
-        gte: thisMonthStart,
-        lte: thisMonthEnd,
-      },
-    },
+    where: getPaidLikeOrderWhere({
+      gte: thisMonthStart,
+      lte: thisMonthEnd,
+    }),
     select: {
       totalAmount: true,
     },
@@ -199,13 +203,10 @@ async function getDashboardData(period: "week" | "month" | "year") {
 
   // 吏????留ㅼ텧
   const lastMonthOrders = await prisma.order.findMany({
-    where: {
-      status: "PAID",
-      createdAt: {
-        gte: lastMonthStart,
-        lte: lastMonthEnd,
-      },
-    },
+    where: getPaidLikeOrderWhere({
+      gte: lastMonthStart,
+      lte: lastMonthEnd,
+    }),
     select: {
       totalAmount: true,
     },
@@ -246,18 +247,18 @@ async function getDashboardData(period: "week" | "month" | "year") {
 
   // 二쇰Ц ?곹깭蹂?嫄댁닔
   const pendingOrders = await prisma.order.count({ where: { status: "PENDING" } })
-  const paidOrders = await prisma.order.count({ where: { status: "PAID" } })
+  const paidOrders = await prisma.order.count({ where: getPaidLikeOrderWhere() })
   const canceledOrders = await prisma.order.count({ where: { status: "CANCELED" } })
 
   // 諛곗넚 ?곹깭蹂?嫄댁닔 (PAID 二쇰Ц 以?
   const preparingOrders = await prisma.order.count({
-    where: { status: "PAID", deliveryStatus: "PREPARING" },
+    where: { ...getPaidLikeOrderWhere(), deliveryStatus: "PREPARING" },
   })
   const inDeliveryOrders = await prisma.order.count({
-    where: { status: "PAID", deliveryStatus: "IN_DELIVERY" },
+    where: { ...getPaidLikeOrderWhere(), deliveryStatus: "IN_DELIVERY" },
   })
   const deliveredOrders = await prisma.order.count({
-    where: { status: "PAID", deliveryStatus: "DELIVERED" },
+    where: { ...getPaidLikeOrderWhere(), deliveryStatus: "DELIVERED" },
   })
 
   // 理쒓렐 二쇰Ц 5媛?
