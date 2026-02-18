@@ -13,7 +13,7 @@ import { toast } from "sonner"
 
 import { RecommendedProducts } from "@/components/recommended-products"
 import { Button } from "@/components/ui/button"
-import { LoadingSpinner } from "@/components/ui/loading-spinner"
+import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { apiRoutes } from "@/lib/apiRoutes"
 import { getCdnUrl } from "@/lib/cdn"
@@ -132,9 +132,35 @@ export default function ProductPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto flex min-h-[50vh] items-center justify-center px-4 py-8">
-        {/* 첫 진입 로딩 상태를 명확히 보여 체감 지연을 줄입니다. */}
-        <LoadingSpinner size={28} label="상품 정보를 불러오는 중" />
+      <div className="container mx-auto px-4 py-8">
+        {/* 상세페이지 로딩 중에도 최종 레이아웃과 비슷한 뼈대를 먼저 보여줍니다. */}
+        <div className="mb-4">
+          <Skeleton className="h-10 w-10 rounded-md" />
+        </div>
+
+        <div className="grid gap-8 md:grid-cols-2">
+          <Skeleton className="aspect-square w-full rounded-lg" />
+
+          <div className="space-y-4">
+            <Skeleton className="h-10 w-4/5" />
+            <Skeleton className="h-8 w-2/5" />
+            <Skeleton className="h-5 w-full" />
+            <Skeleton className="h-5 w-5/6" />
+            <Skeleton className="h-4 w-1/3" />
+            <Skeleton className="h-4 w-1/4" />
+            <div className="space-y-3 pt-2">
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-12 space-y-4">
+          <Skeleton className="h-10 w-64" />
+          <Skeleton className="h-6 w-56" />
+          <Skeleton className="h-5 w-full" />
+          <Skeleton className="h-5 w-4/5" />
+        </div>
       </div>
     )
   }
