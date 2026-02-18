@@ -1,7 +1,7 @@
 "use client"
 // =============================================================================
 // 관리자 신규 상품 등록 - /admin/products/new
-// 기본 정보·이미지 탭, 임시저장(DRAFT), 저장(발행), 취소 시 롤백
+// 기본 정보·미디어 탭, 임시저장(DRAFT), 저장(발행), 취소 시 롤백
 // =============================================================================
 
 import { useState, useRef, useEffect } from "react"
@@ -18,6 +18,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { toast } from "sonner"
 import { Category } from "@/lib/orderEnums"
 import { CreateProductResponse } from "@/app/api/admin/products/route"
+import { isVideoMediaPath } from "@/lib/media"
 
 interface ProductForm {
   name: string
@@ -28,12 +29,35 @@ interface ProductForm {
   category: Category | string
 }
 
-/** 신규 상품 등록: 기본정보 + 이미지 업로드(Presigned URL), 임시저장/저장, 취소 시 롤백 */
+/** 신규 상품 등록: 기본정보 + 미디어 업로드(Presigned URL), 임시저장/저장, 취소 시 롤백 */
 
-// 이미지 미리보기를 위한 인터페이스
-interface ImagePreview {
+// 업로드 허용 타입/용량 정책입니다.
+const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"] as const
+const ALLOWED_VIDEO_TYPES = ["video/mp4", "video/webm", "video/quicktime"] as const
+const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024
+const MAX_VIDEO_SIZE_BYTES = 100 * 1024 * 1024
+
+// 미리보기 렌더링에 필요한 파일+URL 묶음 타입입니다.
+interface MediaPreview {
   file: File
   preview: string
+}
+
+// Presigned URL 응답 타입입니다.
+interface PresignedUploadResponse {
+  uploadUrl: string
+  key: string
+  alreadyExists: boolean
+}
+
+// 업로드 결과와 DB 저장 여부를 함께 반환합니다.
+interface UploadMediaResult {
+  original: string
+  thumbnail: string
+  // DB enum과 동일하게 image/video 문자열로 미디어 타입을 전달합니다.
+  mediaType: "image" | "video"
+  shouldCreateDbRecord: boolean
+  rollbackKeys: string[]
 }
 
 const ROLLBACK_URL = "/api/admin/products/rollback"
@@ -41,7 +65,7 @@ const ROLLBACK_URL = "/api/admin/products/rollback"
 export default function CreateProductPage() {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState("basic")
-  const [imagePreviews, setImagePreviews] = useState<ImagePreview[]>([])
+  const [mediaPreviews, setMediaPreviews] = useState<MediaPreview[]>([])
   const [isUploading, setIsUploading] = useState(false)
   const [isRollingBack, setIsRollingBack] = useState(false)
   const createdProductIdsRef = useRef<number[]>([])
@@ -61,6 +85,50 @@ export default function CreateProductPage() {
     { name: "", description: "", price: 0, stock: 0, category: "", files: [] },
   ])
   const [registrationMode, setRegistrationMode] = useState<"single" | "batch">("single")
+
+  // MIME 타입 기준으로 이미지/동영상 여부를 판별해 업로드 분기를 단순화합니다.
+  const isImageFile = (file: File) => ALLOWED_IMAGE_TYPES.includes(file.type as (typeof ALLOWED_IMAGE_TYPES)[number])
+  const isVideoFile = (file: File) => ALLOWED_VIDEO_TYPES.includes(file.type as (typeof ALLOWED_VIDEO_TYPES)[number])
+
+  // 파일명에서 확장자를 제외한 기본 이름을 뽑아 썸네일 파일명 생성에 사용합니다.
+  const getFileBaseName = (fileName: string) => fileName.replace(/\.[^/.]+$/, "")
+
+  // 파일 정책(타입/용량) 검사를 공통 함수로 묶어서 단일/대량 업로드에 재사용합니다.
+  const validateMediaFile = (file: File, showToast = true) => {
+    const isImage = isImageFile(file)
+    const isVideo = isVideoFile(file)
+    const isValidType = isImage || isVideo
+    const maxSize = isVideo ? MAX_VIDEO_SIZE_BYTES : MAX_IMAGE_SIZE_BYTES
+    const isValidSize = file.size <= maxSize
+
+    if (showToast && !isValidType) {
+      toast.error(`${file.name} 파일 형식은 지원하지 않습니다.`)
+    }
+    if (showToast && !isValidSize) {
+      const maxSizeMb = Math.floor(maxSize / (1024 * 1024))
+      toast.error(`${file.name} 파일 크기는 최대 ${maxSizeMb}MB까지 허용됩니다.`)
+    }
+
+    return isValidType && isValidSize
+  }
+
+  // Presigned URL 발급 요청을 공통화해서 같은 key 생성 규칙을 유지합니다.
+  const requestPresignedUploadUrl = async (params: {
+    fileType: string
+    bucketPath: string
+    fileName: string
+  }): Promise<PresignedUploadResponse> => {
+    const query = new URLSearchParams({
+      fileType: params.fileType,
+      bucketPath: params.bucketPath,
+      fileName: params.fileName,
+    })
+    const response = await fetch(`/api/presignedUrl?${query.toString()}`, { method: "GET" })
+    if (!response.ok) {
+      throw new Error("업로드 URL 발급에 실패했습니다.")
+    }
+    return response.json() as Promise<PresignedUploadResponse>
+  }
 
   // 이미지 압축 함수 (Canvas API 사용)
   const compressImage = async (file: File, maxWidth = 1200, quality = 0.8): Promise<Blob> => {
@@ -123,6 +191,15 @@ export default function CreateProductPage() {
     return compressImage(file, maxWidth, quality);
   };
 
+  // 신규 업로드 key만 추적해서 롤백 시 기존 파일 삭제를 방지합니다.
+  const pushRollbackKeys = (keys: string[]) => {
+    for (const key of keys) {
+      if (!uploadedCdnKeysRef.current.includes(key)) {
+        uploadedCdnKeysRef.current.push(key)
+      }
+    }
+  }
+
   const callRollback = async (productIds: number[], cdnKeys: string[]) => {
     if (productIds.length === 0 && cdnKeys.length === 0) return
     try {
@@ -160,79 +237,101 @@ export default function CreateProductPage() {
     return () => window.removeEventListener("beforeunload", onBeforeUnload)
   }, [])
 
-  // 이미지 업로드 함수
-  const uploadImage = async (file: File): Promise<{ original: string, thumbnail: string } | null> => {
+  // 이미지/동영상 업로드 공통 함수입니다.
+  const uploadMedia = async (file: File): Promise<UploadMediaResult | null> => {
     try {
-      // 1. 원본 이미지 압축
-      const compressedImage = await compressImage(file);
-      
-      // 2. 썸네일 생성
-      const thumbnailImage = await createThumbnail(file);
-      
-      // 3. 원본 이미지 업로드용 Presigned URL 요청
-      const originalResponse = await fetch(
-        `/api/presignedUrl?fileType=${file.type}&bucketPath=products`,
-        { method: "GET" }
-      );
-      
-      if (!originalResponse.ok) {
-        throw new Error("원본 이미지 업로드 URL 발급 실패");
+      if (!validateMediaFile(file)) {
+        return null
       }
-      
-      const { uploadUrl: originalUploadUrl, key: originalKey } = await originalResponse.json();
-      
-      // 4. 썸네일 업로드용 Presigned URL 요청
-      const thumbnailResponse = await fetch(
-        `/api/presignedUrl?fileType=${file.type === 'image/gif' ? 'image/gif' : 'image/webp'}&bucketPath=products/thumbnails`,
-        { method: "GET" }
-      );
-      
-      if (!thumbnailResponse.ok) {
-        throw new Error("썸네일 업로드 URL 발급 실패");
+
+      // 원본 key는 파일명+포맷 기준으로 고정해서 같은 파일명이면 S3에서 덮어쓰기됩니다.
+      const originalUpload = await requestPresignedUploadUrl({
+        fileType: file.type,
+        bucketPath: "products",
+        fileName: file.name,
+      })
+
+      if (isVideoFile(file)) {
+        const originalUploadResponse = await fetch(originalUpload.uploadUrl, {
+          method: "PUT",
+          body: file,
+          headers: {
+            "Content-Type": file.type,
+          },
+        })
+
+        if (!originalUploadResponse.ok) {
+          throw new Error("동영상 업로드 실패")
+        }
+
+        return {
+          original: originalUpload.key,
+          thumbnail: originalUpload.key,
+          mediaType: "video",
+          shouldCreateDbRecord: !originalUpload.alreadyExists,
+          rollbackKeys: originalUpload.alreadyExists ? [] : [originalUpload.key],
+        }
       }
-      
-      const { uploadUrl: thumbnailUploadUrl, key: thumbnailKey } = await thumbnailResponse.json();
-      
-      // 5. 원본 이미지 업로드
-      const originalUploadResponse = await fetch(originalUploadUrl, {
+
+      // 이미지는 기존 정책처럼 원본(압축)+썸네일을 각각 저장합니다.
+      const compressedImage = await compressImage(file)
+      const thumbnailImage = await createThumbnail(file)
+      const thumbnailType = file.type === "image/gif" ? "image/gif" : "image/webp"
+      const thumbnailExt = thumbnailType === "image/gif" ? "gif" : "webp"
+
+      const thumbnailUpload = await requestPresignedUploadUrl({
+        fileType: thumbnailType,
+        bucketPath: "products/thumbnails",
+        fileName: `${getFileBaseName(file.name)}-thumb.${thumbnailExt}`,
+      })
+
+      const originalUploadResponse = await fetch(originalUpload.uploadUrl, {
         method: "PUT",
         body: compressedImage,
         headers: {
           "Content-Type": file.type,
         },
-      });
-      
+      })
+
       if (!originalUploadResponse.ok) {
-        throw new Error("원본 이미지 업로드 실패");
+        throw new Error("원본 이미지 업로드 실패")
       }
-      
-      // 6. 썸네일 업로드
-      const thumbnailUploadResponse = await fetch(thumbnailUploadUrl, {
+
+      const thumbnailUploadResponse = await fetch(thumbnailUpload.uploadUrl, {
         method: "PUT",
         body: thumbnailImage,
         headers: {
-          "Content-Type": file.type === 'image/gif' ? 'image/gif' : 'image/webp',
+          "Content-Type": thumbnailType,
         },
-      });
-      
+      })
+
       if (!thumbnailUploadResponse.ok) {
-        throw new Error("썸네일 업로드 실패");
+        throw new Error("썸네일 업로드 실패")
       }
-      
+
+      const rollbackKeys: string[] = []
+      if (!originalUpload.alreadyExists) rollbackKeys.push(originalUpload.key)
+      if (!thumbnailUpload.alreadyExists && thumbnailUpload.key !== originalUpload.key) {
+        rollbackKeys.push(thumbnailUpload.key)
+      }
+
       return {
-        original: originalKey,
-        thumbnail: thumbnailKey
-      };
+        original: originalUpload.key,
+        thumbnail: thumbnailUpload.key,
+        mediaType: "image",
+        shouldCreateDbRecord: !originalUpload.alreadyExists,
+        rollbackKeys,
+      }
     } catch (error) {
-      console.error("이미지 업로드 중 오류 발생:", error);
-      return null;
+      console.error("미디어 업로드 중 오류 발생:", error)
+      return null
     }
-  };
+  }
 
   // 상품 생성 뮤테이션
   // useMutation은 React Query(또는 TanStack Query)의 훅으로, 
   // 서버에 데이터를 "변경"(생성, 수정, 삭제)할 때 사용합니다.
-  // 여기서는 "신규 상품 생성"을 위해 서버에 POST 요청을 보내는 작업(그리고 뒤따르는 이미지 업로드 등) 
+  // 여기서는 "신규 상품 생성"을 위해 서버에 POST 요청을 보내는 작업(그리고 뒤따르는 미디어 업로드 등) 
   // 전체를 하나의 mutation으로 관리합니다.
   // 이 훅을 쓰면 isLoading 등 상태 관리, 요청에 따른 성공/실패 콜백 처리 등이 간결하게 가능해집니다.
   const createProductMutation = useMutation({
@@ -253,26 +352,39 @@ export default function CreateProductPage() {
         }
 
         const result: CreateProductResponse = await response.json()
+        let skippedDbCount = 0
         createdProductIdsRef.current.push(result.id)
 
-        for (const preview of imagePreviews) {
-          const uploadResult = await uploadImage(preview.file)
+        for (const preview of mediaPreviews) {
+          const uploadResult = await uploadMedia(preview.file)
           if (!uploadResult) {
             throw new Error(`${preview.file.name} 업로드 실패`)
           }
-          uploadedCdnKeysRef.current.push(uploadResult.original, uploadResult.thumbnail)
+
+          // 새로 생성된 S3 key만 롤백 대상에 넣습니다.
+          pushRollbackKeys(uploadResult.rollbackKeys)
+
+          // 기존 key를 덮어쓴 경우 DB 레코드는 추가하지 않습니다.
+          if (!uploadResult.shouldCreateDbRecord) {
+            skippedDbCount += 1
+            continue
+          }
 
           const imageResponse = await fetch(`/api/admin/products/${result.id}/images`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(uploadResult),
+            body: JSON.stringify({
+              original: uploadResult.original,
+              thumbnail: uploadResult.thumbnail,
+              mediaType: uploadResult.mediaType,
+            }),
           })
           if (!imageResponse.ok) {
-            throw new Error("이미지 정보 저장 실패")
+            throw new Error("미디어 정보 저장 실패")
           }
         }
 
-        return result
+        return { product: result, skippedDbCount }
       } catch (err) {
         const ids = [...createdProductIdsRef.current]
         const keys = [...uploadedCdnKeysRef.current]
@@ -287,9 +399,13 @@ export default function CreateProductPage() {
         setIsUploading(false)
       }
     },
-    onSuccess: () => {
+    onSuccess: ({ skippedDbCount }) => {
       createdProductIdsRef.current = []
       uploadedCdnKeysRef.current = []
+      if (skippedDbCount > 0) {
+        // 중복 파일 처리 결과를 사용자에게 명확히 안내합니다.
+        toast.info(`${skippedDbCount}개 파일은 기존 S3 파일을 덮어쓰고 DB 저장을 생략했습니다.`)
+      }
       toast.success("상품이 성공적으로 등록되었습니다")
       router.push("/admin/products")
     },
@@ -330,46 +446,35 @@ export default function CreateProductPage() {
     setIsUploading(false)
   }
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleMediaUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
     
     const newFiles = Array.from(e.target.files);
     
-    // 파일 크기 및 형식 검증
-    const validFiles = newFiles.filter( file => {
-      
-      const isValidSize = file.size <= 5 * 1024 * 1024; // 5MB
-      const isValidType = ["image/jpeg", "image/png", "image/gif", "image/webp"].includes(file.type);
-      
-      if (!isValidSize) toast.error(`${file.name}의 크기가 너무 큽니다 (최대 5MB)`);
-      if (!isValidType) toast.error(`${file.name}의 형식이 지원되지 않습니다`);
-      
-      return isValidSize && isValidType;
-    });
+    // 이미지/동영상 정책 검사(타입/크기)를 통과한 파일만 남깁니다.
+    const validFiles = newFiles.filter((file) => validateMediaFile(file, true))
     
-    // 새 이미지 미리보기 생성
+    // 새 미디어 미리보기를 생성합니다.
     const newPreviews = validFiles.map(file => ({
       file,
       preview: URL.createObjectURL(file)
     }));
     
-    // 이미지 미리보기가 되는 원리:
+    // 미디어 미리보기가 되는 원리:
     // 브라우저의 URL.createObjectURL(file)을 사용하면 사용자의 로컬 파일 객체(file)에 대해 
     // 임시로 접근 가능한 URL을 만들어줌.
-    // 이 URL을 <img src="..."> 같은 곳에 넣으면 사용자의 실제 파일을 서버로 전송하지 않아도 
-    // 화면에 바로 미리보기 이미지로 보여줄 수 있음.
-    // 즉, 업로드 전 이미지 파일 내용을 blob URL로 브라우저가 직접 읽어와서 화면에 표시하는 것.
-    setImagePreviews(prev => [...prev, ...newPreviews]);
+    // 이 URL을 <img>/<video> src에 넣으면 서버 전송 전에도 화면에서 바로 확인할 수 있음.
+    setMediaPreviews(prev => [...prev, ...newPreviews]);
   };
 
-  const removeImage = (index: number) => {
+  const removeMedia = (index: number) => {
     // 미리보기 URL 객체 해제
-    URL.revokeObjectURL(imagePreviews[index].preview);
+    URL.revokeObjectURL(mediaPreviews[index].preview);
     
-    // 이미지 및 미리보기 제거
-    const newPreviews = [...imagePreviews];
+    // 미디어 및 미리보기 제거
+    const newPreviews = [...mediaPreviews];
     newPreviews.splice(index, 1);
-    setImagePreviews(newPreviews);
+    setMediaPreviews(newPreviews);
   };
 
   const handleSave = async () => {
@@ -398,8 +503,8 @@ export default function CreateProductPage() {
       setActiveTab("basic")
       return
     }
-    if (imagePreviews.length === 0) {
-      toast.error("최소 한 개 이상의 이미지를 업로드해주세요")
+    if (mediaPreviews.length === 0) {
+      toast.error("최소 한 개 이상의 이미지/동영상을 업로드해주세요")
       setActiveTab("images")
       return
     }
@@ -452,6 +557,7 @@ export default function CreateProductPage() {
       setIsUploading(true)
       try {
         const created: number[] = []
+        let skippedDbCount = 0
         for (let i = 0; i < batchRows.length; i++) {
           const row = batchRows[i]
           if (!row.name || !row.category) throw new Error(`${i + 1}번째 행: 상품명과 카테고리는 필수입니다`)
@@ -472,18 +578,29 @@ export default function CreateProductPage() {
           created.push(result.id)
           createdProductIdsRef.current.push(result.id)
           for (const file of row.files) {
-            const uploadResult = await uploadImage(file)
-            if (!uploadResult) throw new Error(`${i + 1}번째 상품 이미지 업로드 실패`)
-            uploadedCdnKeysRef.current.push(uploadResult.original, uploadResult.thumbnail)
+            const uploadResult = await uploadMedia(file)
+            if (!uploadResult) throw new Error(`${i + 1}번째 상품 미디어 업로드 실패`)
+            pushRollbackKeys(uploadResult.rollbackKeys)
+
+            // 기존 key를 덮어쓴 경우 DB 저장을 건너뜁니다.
+            if (!uploadResult.shouldCreateDbRecord) {
+              skippedDbCount += 1
+              continue
+            }
+
             const imgRes = await fetch(`/api/admin/products/${result.id}/images`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(uploadResult),
+              body: JSON.stringify({
+                original: uploadResult.original,
+                thumbnail: uploadResult.thumbnail,
+                mediaType: uploadResult.mediaType,
+              }),
             })
-            if (!imgRes.ok) throw new Error(`${i + 1}번째 상품 이미지 저장 실패`)
+            if (!imgRes.ok) throw new Error(`${i + 1}번째 상품 미디어 저장 실패`)
           }
         }
-        return created
+        return { created, skippedDbCount }
       } catch (err) {
         const ids = [...createdProductIdsRef.current]
         const keys = [...uploadedCdnKeysRef.current]
@@ -498,10 +615,13 @@ export default function CreateProductPage() {
         setIsUploading(false)
       }
     },
-    onSuccess: (ids) => {
+    onSuccess: ({ created, skippedDbCount }) => {
       createdProductIdsRef.current = []
       uploadedCdnKeysRef.current = []
-      toast.success(`${ids.length}건 등록되었습니다`)
+      if (skippedDbCount > 0) {
+        toast.info(`${skippedDbCount}개 파일은 기존 S3 파일을 덮어쓰고 DB 저장을 생략했습니다.`)
+      }
+      toast.success(`${created.length}건 등록되었습니다`)
       router.push("/admin/products")
     },
     onError: (e) => {
@@ -518,7 +638,7 @@ export default function CreateProductPage() {
     batchUploadMutation.mutate()
   }
 
-  // handleSave 함수: 필수 필드(상품명, 설명, 카테고리, 가격, 재고, 이미지) 검증 후 
+  // handleSave 함수: 필수 필드(상품명, 설명, 카테고리, 가격, 재고, 이미지/동영상) 검증 후 
   // 상품 생성 mutation 실행
   // (react-query의 useMutation을 이용)
   return (
@@ -573,7 +693,7 @@ export default function CreateProductPage() {
         <Card className="mb-6">
           <CardHeader>
             <CardTitle>일괄 등록</CardTitle>
-            <p className="text-sm text-muted-foreground">각 행에 상품 정보와 이미지를 입력한 뒤 일괄 등록하세요. 취소 시 이번에 생성한 항목만 롤백됩니다.</p>
+            <p className="text-sm text-muted-foreground">각 행에 상품 정보와 이미지/동영상을 입력한 뒤 일괄 등록하세요. 취소 시 이번에 생성한 항목만 롤백됩니다.</p>
           </CardHeader>
           <CardContent className="space-y-4">
             {batchRows.map((row, index) => (
@@ -615,14 +735,16 @@ export default function CreateProductPage() {
                   <Textarea value={row.description} onChange={(e) => updateBatchRow(index, "description", e.target.value)} rows={2} placeholder="선택 입력" />
                 </div>
                 <div>
-                  <Label>이미지</Label>
+                  <Label>이미지/동영상</Label>
                   <Input
                     type="file"
-                    accept="image/jpeg,image/png,image/gif,image/webp"
+                    accept="image/jpeg,image/png,image/gif,image/webp,video/mp4,video/webm,video/quicktime"
                     multiple
                     onChange={(e) => {
                       const files = e.target.files ? Array.from(e.target.files) : []
-                      updateBatchRow(index, "files", files)
+                      // 대량 등록도 단일 등록과 같은 파일 정책을 적용합니다.
+                      const validFiles = files.filter((file) => validateMediaFile(file, true))
+                      updateBatchRow(index, "files", validFiles)
                     }}
                   />
                   {row.files.length > 0 && <span className="text-xs text-muted-foreground">{row.files.length}개 파일</span>}
@@ -652,7 +774,7 @@ export default function CreateProductPage() {
       <Tabs defaultValue="basic" value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="mb-4">
           <TabsTrigger value="basic">기본 정보</TabsTrigger>
-          <TabsTrigger value="images">이미지</TabsTrigger>
+          <TabsTrigger value="images">미디어</TabsTrigger>
         </TabsList>
 
         <TabsContent value="basic">
@@ -747,41 +869,47 @@ export default function CreateProductPage() {
         <TabsContent value="images">
           <Card>
             <CardHeader>
-              <CardTitle>상품 이미지</CardTitle>
+              <CardTitle>상품 미디어</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="mb-4">
                 <Label htmlFor="imageUpload" className="cursor-pointer">
                   <div className="border border-dashed rounded-lg p-8 flex flex-col items-center justify-center">
                     <Upload className="h-8 w-8 mb-2 text-muted-foreground" />
-                    <p className="text-sm font-medium">이미지 파일을 드래그하거나 클릭하여 업로드</p>
-                    <p className="text-xs text-muted-foreground mt-1">JPG, PNG, GIF, WEBP 형식 (최대 5MB)</p>
+                    <p className="text-sm font-medium">이미지/동영상 파일을 드래그하거나 클릭하여 업로드</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      이미지: JPG/PNG/GIF/WEBP(최대 5MB), 동영상: MP4/WEBM/MOV(최대 100MB)
+                    </p>
                   </div>
                   <Input
                     id="imageUpload"
                     type="file"
-                    accept="image/jpeg,image/png,image/gif,image/webp"
+                    accept="image/jpeg,image/png,image/gif,image/webp,video/mp4,video/webm,video/quicktime"
                     multiple
                     className="hidden"
-                    onChange={handleImageUpload}
+                    onChange={handleMediaUpload}
                   />
                 </Label>
               </div>
 
-              {imagePreviews.length > 0 && (
+              {mediaPreviews.length > 0 && (
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
-                  {imagePreviews.map((image, index) => (
+                  {mediaPreviews.map((media, index) => (
                     <div key={index} className="relative border rounded-lg overflow-hidden h-40">
-                      <img
-                        src={image.preview}
-                        alt={`미리보기 ${index + 1}`}
-                        className="w-full h-full object-cover"
-                      />
+                      {isVideoMediaPath(media.file.name) || media.file.type.startsWith("video/") ? (
+                        <video src={media.preview} className="w-full h-full object-cover" muted playsInline controls />
+                      ) : (
+                        <img
+                          src={media.preview}
+                          alt={`미리보기 ${index + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                      )}
                       <Button
                         variant="destructive"
                         size="icon"
                         className="absolute top-2 right-2 h-6 w-6"
-                        onClick={() => removeImage(index)}
+                        onClick={() => removeMedia(index)}
                       >
                         <X className="h-3 w-3" />
                       </Button>

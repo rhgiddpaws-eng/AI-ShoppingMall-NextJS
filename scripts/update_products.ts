@@ -1,6 +1,6 @@
 // npx tsx scripts/update_products.ts
 
-import { PrismaClient, Category } from '@prisma/client'
+import { PrismaClient, Category, MediaType } from '@prisma/client'
 import fs from 'fs'
 import path from 'path'
 import OpenAI from 'openai'
@@ -38,7 +38,11 @@ type ProductJsonRow = {
 }
 
 type ExistingKeys = { original: string; thumbnail: string }
-type MediaUploadResult = { originalKey: string | null; thumbnailKey: string | null }
+type MediaUploadResult = {
+  originalKey: string | null
+  thumbnailKey: string | null
+  mediaType: MediaType | null
+}
 
 type CliOptions = {
   nameExact?: string
@@ -189,10 +193,10 @@ async function processAndUploadImage(
       uploadToS3(thumbnailBuffer, thumbnailKey, 'image/webp'),
     ])
 
-    return { originalKey, thumbnailKey }
+    return { originalKey, thumbnailKey, mediaType: 'image' }
   } catch (error) {
     console.error('이미지 처리/업로드 중 오류 발생:', error)
-    return { originalKey: null, thumbnailKey: null }
+    return { originalKey: null, thumbnailKey: null, mediaType: null }
   }
 }
 
@@ -238,10 +242,10 @@ async function processAndUploadVideo(
       thumbnailKey = originalKey
     }
 
-    return { originalKey, thumbnailKey }
+    return { originalKey, thumbnailKey, mediaType: 'video' }
   } catch (error) {
     console.error('동영상 처리/업로드 중 오류 발생:', error)
-    return { originalKey: null, thumbnailKey: null }
+    return { originalKey: null, thumbnailKey: null, mediaType: null }
   }
 }
 
@@ -426,9 +430,12 @@ async function main() {
               `  - 미디어 처리 중 (${j + 1}/${product.images.length}): ${targetKeys ? '기존 슬롯 갱신' : '새 슬롯 추가'}`,
             )
 
-            const { originalKey, thumbnailKey } = await processAndUploadMedia(fullMediaPath, targetKeys)
+            const { originalKey, thumbnailKey, mediaType } = await processAndUploadMedia(
+              fullMediaPath,
+              targetKeys,
+            )
 
-            if (!originalKey || !thumbnailKey) {
+            if (!originalKey || !thumbnailKey || !mediaType) {
               console.warn('  - [경고] 업로드 실패로 해당 슬롯을 건너뜁니다.')
               continue
             }
@@ -436,7 +443,9 @@ async function main() {
             if (existingImageSlot) {
               const shouldUpdateKey =
                 existingImageSlot.original !== originalKey ||
-                existingImageSlot.thumbnail !== thumbnailKey
+                existingImageSlot.thumbnail !== thumbnailKey ||
+                // 키가 같아도 타입 불일치면 DB 보정이 필요합니다.
+                existingImageSlot.mediaType !== mediaType
 
               if (shouldUpdateKey) {
                 await prisma.image.update({
@@ -444,6 +453,8 @@ async function main() {
                   data: {
                     original: originalKey,
                     thumbnail: thumbnailKey,
+                    // png -> mp4 변환처럼 타입이 바뀌면 mediaType도 함께 반영합니다.
+                    mediaType,
                   },
                 })
 
@@ -467,6 +478,8 @@ async function main() {
                 data: {
                   original: originalKey,
                   thumbnail: thumbnailKey,
+                  // 신규 미디어는 DB에 타입을 명시적으로 기록합니다.
+                  mediaType,
                   productId: existingProduct.id,
                 },
               })

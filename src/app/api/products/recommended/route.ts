@@ -25,6 +25,7 @@ type ProductWithImage = {
     id: number
     original: string
     thumbnail: string
+    mediaType: "image" | "video"
   }>
 }
 
@@ -63,6 +64,7 @@ async function findFallbackProducts(excludeId: number, categoryValue: string | n
           id: true,
           original: true,
           thumbnail: true,
+          mediaType: true,
         },
       },
     },
@@ -91,6 +93,7 @@ async function findFallbackProducts(excludeId: number, categoryValue: string | n
           id: true,
           original: true,
           thumbnail: true,
+          mediaType: true,
         },
       },
     },
@@ -170,6 +173,7 @@ export async function GET(request: Request) {
               id: true,
               original: true,
               thumbnail: true,
+              mediaType: true,
             },
           },
         },

@@ -17,7 +17,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { apiRoutes } from "@/lib/apiRoutes"
 import { getCdnUrl } from "@/lib/cdn"
-import { isVideoMediaPath } from "@/lib/media"
+import { isVideoMediaPath, isVideoMediaType } from "@/lib/media"
 import { useShopStore } from "@/lib/store"
 
 type ProductType = {
@@ -32,6 +32,7 @@ type ProductType = {
     id: number
     original: string
     thumbnail: string
+    mediaType: "image" | "video"
   }[]
 }
 
@@ -42,8 +43,13 @@ type ProductType = {
 function getPreviewImageUrl(product: ProductType): string {
   const first = product.images[0]
   if (!first) return "/placeholder.svg"
+  // DB mediaType이 image이면 썸네일을 우선 사용해 리스트 렌더링 비용을 줄입니다.
+  if (first.thumbnail && !isVideoMediaType(first.mediaType)) return getCdnUrl(first.thumbnail)
+  if (first.original && !isVideoMediaType(first.mediaType) && !isVideoMediaPath(first.original)) {
+    return getCdnUrl(first.original)
+  }
   if (first.thumbnail) return getCdnUrl(first.thumbnail)
-  if (first.original && !isVideoMediaPath(first.original)) return getCdnUrl(first.original)
+  if (first.original) return getCdnUrl(first.original)
   return "/placeholder.svg"
 }
 
@@ -200,7 +206,8 @@ export default function ProductPage() {
   const mediaPosterUrl = firstMedia?.thumbnail ? getCdnUrl(firstMedia.thumbnail) : undefined
 
   // 동영상 원본이 들어오면 상세 메인 영역에서 자동 재생 비디오로 렌더링합니다.
-  const isVideoMedia = isVideoMediaPath(mediaUrl)
+  // DB mediaType을 우선 사용하고, 기존 데이터는 확장자 판별로 fallback 합니다.
+  const isVideoMedia = isVideoMediaType(firstMedia?.mediaType) || isVideoMediaPath(mediaUrl)
   const isRemoteImage =
     !isVideoMedia && (mediaUrl.startsWith("http://") || mediaUrl.startsWith("https://"))
 

@@ -412,7 +412,7 @@ async function getDashboardData(period: DashboardPeriod) {
           ? "배송 완료"
           : order.delivery_status === "IN_DELIVERY"
             ? "배송 중"
-          : order.status === "PAID"
+            : order.status === "PAID"
               ? "결제 완료"
               : "결제 대기",
       amount: Math.round(order.total_amount),
@@ -430,9 +430,9 @@ type DashboardResponse = Awaited<ReturnType<typeof getDashboardData>>
 const DASHBOARD_CACHE_TTL_MS = 60 * 1000
 let dashboardCache:
   | {
-      expiresAt: number
-      dataByPeriod: Partial<Record<DashboardPeriod, DashboardResponse>>
-    }
+    expiresAt: number
+    dataByPeriod: Partial<Record<DashboardPeriod, DashboardResponse>>
+  }
   | null = null
 
 export async function GET(request: Request) {
@@ -458,5 +458,4 @@ export async function GET(request: Request) {
   dashboardCache.dataByPeriod[validPeriod] = dashboardData
   return NextResponse.json(dashboardData)
 }
-
 

@@ -41,6 +41,8 @@ interface ProductData {
     id: number
     original: string
     thumbnail: string
+    // DB에서 내려준 mediaType으로 카드에서 이미지/동영상을 안정적으로 분기합니다.
+    mediaType: "image" | "video"
   }[]
 }
 

@@ -15,14 +15,14 @@
     "download-clone-images": "node scripts/download-pexels-by-category.js",
     "upscale-all": "node scripts/upscale-all-to-high-quality.js",
     "audit-images": "node scripts/audit-image-quality.js",
-    "migrate": "npx dotenv-cli -e .env.host -- prisma migrate dev",
-    "migrate:reset": "npx dotenv-cli -e .env.host -- prisma migrate reset",
-    "seed": "npx dotenv-cli -e .env.host -- prisma db seed",
-    "studio": "npx dotenv-cli -e .env.host -- prisma studio",
-    "reset-password": "npx dotenv-cli -e .env.host -- tsx scripts/reset-admin-password.ts",
-    "set-admin-role": "npx dotenv-cli -e .env.host -- tsx scripts/set-admin-role.ts",
-    "update-products": "npx dotenv-cli -e .env.host -- tsx scripts/update_products.ts",
-    "upload-products": "npx dotenv-cli -e .env.host -- tsx scripts/upload_products.ts"
+    "migrate": "npx dotenv-cli -e .env -- prisma migrate dev",
+    "migrate:reset": "npx dotenv-cli -e .env -- prisma migrate reset",
+    "seed": "npx dotenv-cli -e .env -- prisma db seed",
+    "studio": "npx dotenv-cli -e .env -- prisma studio",
+    "reset-password": "npx dotenv-cli -e .env -- tsx scripts/reset-admin-password.ts",
+    "set-admin-role": "npx dotenv-cli -e .env -- tsx scripts/set-admin-role.ts",
+    "update-products": "npx dotenv-cli -e .env -- tsx scripts/update_products.ts",
+    "upload-products": "npx dotenv-cli -e .env -- tsx scripts/upload_products.ts"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

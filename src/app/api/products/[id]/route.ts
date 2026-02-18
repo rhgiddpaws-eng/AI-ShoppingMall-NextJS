@@ -37,6 +37,8 @@ export async function GET(
             id: true,
             original: true,
             thumbnail: true,
+            // 상세 화면에서도 DB mediaType으로 이미지/동영상을 바로 구분합니다.
+            mediaType: true,
           },
         },
       },

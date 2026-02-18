@@ -68,6 +68,8 @@ export async function GET(request: NextRequest) {
             id: true,
             original: true,
             thumbnail: true,
+            // DB mediaType도 함께 내려서 UI가 명시적으로 분기할 수 있게 합니다.
+            mediaType: true,
           },
         },
       },

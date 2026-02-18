@@ -15,6 +15,8 @@ export type ProductImage = {
   id: number
   original: string
   thumbnail: string
+  // 카드 렌더링에서 확장자 파싱 없이 미디어 타입을 바로 사용합니다.
+  mediaType: "image" | "video"
 }
 
 export type ProductWithImages = {
@@ -88,6 +90,7 @@ export async function GET(request: NextRequest) {
             id: true,
             original: true,
             thumbnail: true,
+            mediaType: true,
           },
         },
       },

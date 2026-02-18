@@ -2,6 +2,8 @@
  * 파일 경로/URL에서 확장자를 안전하게 추출합니다.
  * - 쿼리스트링/해시가 붙어 있어도 확장자 판단이 가능해야 합니다.
  */
+export type MediaTypeValue = "image" | "video"
+
 function getNormalizedExt(pathOrUrl: string): string {
   const [withoutQuery] = pathOrUrl.split("?")
   const [withoutHash] = withoutQuery.split("#")
@@ -21,14 +23,28 @@ export function isVideoMediaPath(pathOrUrl: string | null | undefined): boolean 
 }
 
 /**
+ * DB mediaType 값을 우선으로 써서 동영상 여부를 판별합니다.
+ * - 값이 비어 있으면 기존 확장자 판별로 자연스럽게 fallback 됩니다.
+ */
+export function isVideoMediaType(mediaType: string | null | undefined): boolean {
+  return mediaType?.toLowerCase() === "video"
+}
+
+/**
  * 카드에 사용할 대표 미디어 키를 고릅니다.
  * - 원본이 동영상이면 원본을 우선 사용해 카드에서도 비디오가 보이게 합니다.
  * - 그 외에는 thumbnail 우선 정책을 유지해 로딩 부담을 줄입니다.
  */
 export function pickCardMediaKey(
-  media: { original?: string | null; thumbnail?: string | null } | null | undefined,
+  media:
+    | { original?: string | null; thumbnail?: string | null; mediaType?: MediaTypeValue | string | null }
+    | null
+    | undefined,
 ): string {
   if (!media) return ""
+  // DB에 mediaType이 저장되어 있으면 그 값을 최우선으로 사용합니다.
+  if (isVideoMediaType(media.mediaType)) return media.original ?? media.thumbnail ?? ""
+  if (media.mediaType?.toLowerCase() === "image") return media.thumbnail ?? media.original ?? ""
   if (isVideoMediaPath(media.original ?? "")) return media.original ?? ""
   return media.thumbnail ?? media.original ?? ""
 }

@@ -41,6 +41,8 @@ type InfiniteProductsResponse = {
       id: number
       original: string
       thumbnail: string
+      // 카드 미디어 분기에서 DB mediaType을 사용할 수 있게 타입에 포함합니다.
+      mediaType: "image" | "video"
     }>
   }>
   hasMore: boolean
