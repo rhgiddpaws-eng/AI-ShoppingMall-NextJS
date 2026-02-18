@@ -13,6 +13,7 @@ import { useInfiniteQuery } from "@tanstack/react-query"
 import { useInView } from "react-intersection-observer"
 
 import ProductCard from "@/components/product-card"
+import { ProductCardSkeleton } from "@/components/product-card-skeleton"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -24,6 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { Skeleton } from "@/components/ui/skeleton"
 import useInputDebounce from "@/hooks/useInputDebounce"
 import { apiRoutes } from "@/lib/apiRoutes"
 import { getCdnUrl } from "@/lib/cdn"
@@ -53,6 +55,7 @@ const CATEGORY_LABEL_MAP: Record<string, string> = {
   sale: "세일",
   new: "신상품",
 }
+const CATEGORY_SKELETON_COUNT = 8
 
 export default function CategoryPage() {
   const params = useParams()
@@ -164,11 +167,26 @@ export default function CategoryPage() {
   const allProducts = data?.pages.flatMap(page => page?.products ?? []) ?? []
   const titleLabel = CATEGORY_LABEL_MAP[category] ?? `${category} 카테고리`
 
-  // 상세 페이지와 동일한 진입 경험을 위해 첫 로딩 때 스피너를 먼저 보여줍니다.
+  // 카테고리 진입 직후에는 스피너 대신 카드 뼈대를 먼저 보여줘 빈 화면 느낌을 줄입니다.
   if (isLoading && allProducts.length === 0) {
     return (
-      <div className="container mx-auto flex min-h-[50vh] items-center justify-center px-4 py-8">
-        <LoadingSpinner size={28} label="카테고리 상품을 불러오는 중" />
+      <div className="container mx-auto px-4 py-8">
+        <div className="mb-8 flex items-center gap-3">
+          <Skeleton className="h-10 w-10 rounded-md" />
+          <Skeleton className="h-8 w-40" />
+        </div>
+
+        <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+        </div>
+
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+          {Array.from({ length: CATEGORY_SKELETON_COUNT }).map((_, index) => (
+            <ProductCardSkeleton key={`category-page-skeleton-${index}`} />
+          ))}
+        </div>
       </div>
     )
   }
