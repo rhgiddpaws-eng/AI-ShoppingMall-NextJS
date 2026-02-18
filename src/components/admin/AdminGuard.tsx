@@ -7,8 +7,8 @@ const ADMIN_ME_URL = "/api/admin/me"
 
 /**
  * 레이아웃에서 cookies()가 비어 있을 때 대비.
- * 클라이언트에서 GET /api/admin/me (credentials: include)로 관리자 여부 확인 후,
- * 비관리자면 / 로 리다이렉트, 관리자면 children 렌더.
+ * 클라이언트에서 GET /api/admin/me (credentials: include)로 로그인 여부 확인 후,
+ * 비로그인이면 /login 으로 리다이렉트, 로그인 상태면 children 렌더.
  */
 export function AdminGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter()
@@ -23,13 +23,15 @@ export function AdminGuard({ children }: { children: React.ReactNode }) {
           setAllowed(true)
         } else {
           setAllowed(false)
-          router.replace("/")
+          // 로그인 후 다시 관리자 화면으로 돌아올 수 있게 returnUrl을 함께 전달합니다.
+          router.replace("/login?returnUrl=/admin")
         }
       })
       .catch(() => {
         if (!cancelled) {
           setAllowed(false)
-          router.replace("/")
+          // 네트워크 오류 시에도 관리자 페이지를 무한 대기시키지 않고 로그인 화면으로 보냅니다.
+          router.replace("/login?returnUrl=/admin")
         }
       })
     return () => {

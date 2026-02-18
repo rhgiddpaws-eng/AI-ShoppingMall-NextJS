@@ -6,11 +6,11 @@
  * - 검색어 제출 시 /category/new?term=... 으로 이동합니다.
  */
 
-import { FormEvent, useState } from "react"
+import { FormEvent, useEffect, useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
-import { ShoppingCart, Search, User, Heart, Menu, LogIn } from "lucide-react"
+import { ShoppingCart, Search, User, Heart, Menu, LogIn, Shield } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -24,7 +24,12 @@ import {
 } from "@/components/ui/sheet"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { useAuthStore, useShopStore } from "@/lib/store"
-import { warmCategoryRoute } from "@/lib/route-warmup"
+import {
+  warmAdminApis,
+  warmCategoryRoute,
+  warmLoggedInApis,
+  warmPrimaryRoutes,
+} from "@/lib/route-warmup"
 
 type CategoryLink = {
   href: string
@@ -60,46 +65,91 @@ export function NavBar() {
     router.push(`/category/new?term=${encodeURIComponent(trimmed)}`)
   }
 
+  useEffect(() => {
+    // 초기 렌더가 끝난 뒤 여유 시간에 핵심 이동 경로를 미리 prefetch해 첫 페이지 이동 지연을 줄입니다.
+    const runWarmup = () => {
+      warmPrimaryRoutes(router, Boolean(user))
+      if (user) warmLoggedInApis()
+    }
+
+    const browserGlobal = globalThis as typeof globalThis & {
+      requestIdleCallback?: (callback: () => void) => number
+      cancelIdleCallback?: (handle: number) => void
+    }
+
+    if (typeof browserGlobal.requestIdleCallback === "function") {
+      const idleId = browserGlobal.requestIdleCallback(() => runWarmup())
+      return () => browserGlobal.cancelIdleCallback?.(idleId)
+    }
+
+    const timeoutId = setTimeout(runWarmup, 120)
+    return () => clearTimeout(timeoutId)
+  }, [router, user])
+
   return (
     <header className="border-b">
       <div className="container mx-auto flex items-center justify-between gap-3 px-4 py-2">
-        <div className="flex items-center gap-2 md:hidden">
-          <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" aria-label="메뉴">
-                <Menu className="h-5 w-5" />
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="left" className="w-64">
-              <SheetHeader>
-                <SheetTitle className="sr-only">카테고리 메뉴</SheetTitle>
-              </SheetHeader>
-              <nav className="flex flex-col gap-2 pt-4">
-                {categoryLinks.map(({ href, label, className }) => (
-                  <Link
-                    key={href}
-                    href={href}
-                    prefetch={false}
-                    className={`block py-2 font-medium hover:text-primary ${className ?? ""}`}
-                    onTouchStart={() => handleCategoryIntent(href)}
-                    onFocus={() => handleCategoryIntent(href)}
-                    onClick={() => {
-                      handleCategoryIntent(href)
-                      setMobileMenuOpen(false)
-                    }}
-                  >
-                    {label}
-                  </Link>
-                ))}
-              </nav>
-            </SheetContent>
-          </Sheet>
-        </div>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 md:hidden">
+            <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" aria-label="메뉴">
+                  <Menu className="h-5 w-5" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="w-64">
+                <SheetHeader>
+                  <SheetTitle className="sr-only">카테고리 메뉴</SheetTitle>
+                </SheetHeader>
+                <nav className="flex flex-col gap-2 pt-4">
+                  {categoryLinks.map(({ href, label, className }) => (
+                    <Link
+                      key={href}
+                      href={href}
+                      prefetch={false}
+                      className={`block py-2 font-medium hover:text-primary ${className ?? ""}`}
+                      onTouchStart={() => handleCategoryIntent(href)}
+                      onFocus={() => handleCategoryIntent(href)}
+                      onClick={() => {
+                        handleCategoryIntent(href)
+                        setMobileMenuOpen(false)
+                      }}
+                    >
+                      {label}
+                    </Link>
+                  ))}
+                </nav>
+              </SheetContent>
+            </Sheet>
+          </div>
 
-        <Link href="/" className="flex shrink-0 items-center gap-2">
-          <Image src="/kus-logo.svg" alt="KUS 스타일" width={40} height={40} />
-          <span className="hidden text-xl font-bold sm:inline-block">KUS 스타일</span>
-        </Link>
+          <Link href="/" className="flex shrink-0 items-center gap-2">
+            <Image src="/kus-logo.svg" alt="KUS 스타일" width={40} height={40} />
+            <span className="hidden text-xl font-bold sm:inline-block">KUS 스타일</span>
+          </Link>
+
+          {user ? (
+            // 로그인 사용자에게만 좌측 상단에서 바로 관리자 페이지 진입 버튼을 노출합니다.
+            <Button variant="outline" size="sm" asChild className="gap-1.5">
+              <Link
+                href="/admin"
+                aria-label="관리자 페이지"
+                onMouseEnter={() => {
+                  // 관리자 버튼에 커서가 닿으면 관리자 경로/인증 API를 즉시 예열합니다.
+                  warmPrimaryRoutes(router, true)
+                  warmAdminApis()
+                }}
+                onFocus={() => {
+                  warmPrimaryRoutes(router, true)
+                  warmAdminApis()
+                }}
+              >
+                <Shield className="h-4 w-4 shrink-0" />
+                <span className="hidden sm:inline">Admin</span>
+              </Link>
+            </Button>
+          ) : null}
+        </div>
 
         <nav className="hidden items-center gap-6 md:flex">
           {categoryLinks.map(({ href, label, className }) => (
