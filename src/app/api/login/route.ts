@@ -25,7 +25,8 @@ export type LoginResponse = {
 
 const loginSchema = z.object({
   email: z.string().email({ message: '올바른 이메일 주소를 입력해주세요.' }),
-  password: z.string().min(8, { message: '비밀번호는 8자 이상이어야 합니다.' }),
+  // 회원가입(6자 이상) 기준과 동일하게 맞춰 기존 계정 로그인 실패를 막습니다.
+  password: z.string().min(6, { message: '비밀번호는 6자 이상이어야 합니다.' }),
 })
 
 type LoginForm = z.infer<typeof loginSchema>

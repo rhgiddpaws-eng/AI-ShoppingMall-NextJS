@@ -33,6 +33,9 @@ model User {
   wishlist          Wishlist?
   inquiries         Inquiry[]
   riderLocationLogs RiderLocationLog[]
+
+  // 관리자 대시보드의 월별 신규 회원 집계를 빠르게 하기 위한 인덱스
+  @@index([createdAt])
 }
 
 model Address {
@@ -73,6 +76,8 @@ model Product {
   @@index([status, category, createdAt])
   // "신상품(전체 최신순)" 조회를 빠르게 하기 위한 인덱스
   @@index([status, createdAt])
+  // 관리자 대시보드의 재고 부족 상품 조회를 빠르게 하기 위한 인덱스
+  @@index([stock])
 }
 
 model Cart {
@@ -181,6 +186,10 @@ model Order {
   riderLocationLogs RiderLocationLog[]
 
   @@index([status, deliveryStatus])
+  // 관리자 대시보드의 기간 집계/최근 주문 조회를 빠르게 하기 위한 인덱스
+  @@index([createdAt])
+  // 배송 상태 필터 집계를 빠르게 하기 위한 인덱스
+  @@index([deliveryStatus])
   @@index([externalDeliveryId])
   @@index([trackingNumber])
   @@index([deliveryProvider, externalDeliveryStatus])
@@ -257,6 +266,10 @@ model Payment {
   status         PaymentStatus
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
+
+  // paid/waiting 상태 결합 필터를 빠르게 하기 위한 인덱스
+  @@index([status])
+  @@index([status, orderId])
 }
 
 enum OrderStatus {

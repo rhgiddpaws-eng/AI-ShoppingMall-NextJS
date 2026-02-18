@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge"
 
 /** 탭 값: 일(일별) / 월(월별) / 년(연별) — API period와 명시적 매핑 */
 const TAB_TO_API_PERIOD = { 일: "week", 월: "month", 년: "year" } as const
+const ALL_API_PERIODS = ["week", "month", "year"] as const
 type TabPeriod = keyof typeof TAB_TO_API_PERIOD
 type ApiPeriod = (typeof TAB_TO_API_PERIOD)[TabPeriod]
 
@@ -34,7 +35,7 @@ type DashboardData = {
     orders: { value: number; isPositive: boolean }
     lowStock: { value: number; isPositive: boolean }
   }
-  salesData: Array<{ name: string; sales?: number; 매출?: number; "留ㅼ텧"?: number }>
+  salesData: Array<{ name: string; sales?: number; 매출?: number }>
   orderStatus: {
     pending: number
     confirmed: number
@@ -62,53 +63,98 @@ type DashboardData = {
 export default function AdminDashboard() {
   const [tabPeriod, setTabPeriod] = useState<TabPeriod>("월")
   const apiPeriod = TAB_TO_API_PERIOD[tabPeriod]
+  const [dashboardCache, setDashboardCache] = useState<Partial<Record<ApiPeriod, DashboardData>>>({})
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
   const [isPeriodLoading, setIsPeriodLoading] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
-  const latestRequestIdRef = useRef(0)
+  const inFlightPeriodsRef = useRef<Set<ApiPeriod>>(new Set())
 
   useEffect(() => {
-    const controller = new AbortController()
-    const requestId = latestRequestIdRef.current + 1
-    latestRequestIdRef.current = requestId
-    const isInitialLoad = dashboardData == null
+    const controllers: AbortController[] = []
+    let cancelled = false
     setLoadError(null)
-    if (isInitialLoad) {
-      setLoading(true)
-    } else {
-      setIsPeriodLoading(true)
-    }
 
-    const fetchDashboardData = async () => {
+    const fetchDashboardData = async (targetPeriod: ApiPeriod, mode: "active" | "background") => {
+      if (inFlightPeriodsRef.current.has(targetPeriod)) return
+      if (dashboardCache[targetPeriod]) {
+        if (targetPeriod === apiPeriod) {
+          setDashboardData(dashboardCache[targetPeriod] ?? null)
+          setLoading(false)
+          setIsPeriodLoading(false)
+        }
+        return
+      }
+
+      const controller = new AbortController()
+      controllers.push(controller)
+      inFlightPeriodsRef.current.add(targetPeriod)
+
+      // 첫 진입은 전체 로딩, 탭 전환은 부분 로딩으로 처리해 화면 깜빡임을 줄입니다.
+      if (mode === "active") {
+        if (dashboardData == null) {
+          setLoading(true)
+        } else {
+          setIsPeriodLoading(true)
+        }
+      }
+
       try {
-        const response = await fetch(`/api/admin/dashboard?period=${apiPeriod}`, {
+        const response = await fetch(`/api/admin/dashboard?period=${targetPeriod}`, {
           cache: "no-store",
-          signal: controller.signal,
+          signal: controller.signal
         })
         if (!response.ok) {
           throw new Error("데이터를 불러오는데 실패했습니다")
         }
         const data = (await response.json()) as DashboardData
-        // 더 최신 탭 요청이 이미 시작된 경우 구 응답은 버려서 화면 역전(race)을 방지합니다.
-        if (latestRequestIdRef.current !== requestId) return
-        setDashboardData(data)
+        if (cancelled) return
+        setDashboardCache((prev) => ({ ...prev, [targetPeriod]: data }))
+        if (targetPeriod === apiPeriod) {
+          setDashboardData(data)
+        }
       } catch (error) {
         // 탭 전환으로 인한 취소 에러는 정상 흐름이므로 무시합니다.
         if (error instanceof DOMException && error.name === "AbortError") return
-        if (latestRequestIdRef.current !== requestId) return
-        console.error("대시보드 데이터 로딩 오류:", error)
-        setLoadError("대시보드 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.")
+        if (cancelled) return
+        if (mode === "active") {
+          console.error("대시보드 데이터 로딩 오류:", error)
+          // 활성 탭 데이터 로딩이 실패하면 이전 탭 잔상이 남지 않도록 화면을 비웁니다.
+          setDashboardData(null)
+          setLoadError("대시보드 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.")
+        }
       } finally {
-        if (latestRequestIdRef.current !== requestId) return
-        setLoading(false)
-        setIsPeriodLoading(false)
+        inFlightPeriodsRef.current.delete(targetPeriod)
+        if (!cancelled && mode === "active") {
+          setLoading(false)
+          setIsPeriodLoading(false)
+        }
       }
     }
 
-    void fetchDashboardData()
+    const run = async () => {
+      const selectedData = dashboardCache[apiPeriod]
+      if (selectedData) {
+        setDashboardData(selectedData)
+        setLoading(false)
+        setIsPeriodLoading(false)
+      } else {
+        await fetchDashboardData(apiPeriod, "active")
+      }
+
+      // 탭 전환 지연을 줄이기 위해 나머지 period는 백그라운드에서 미리 받아둡니다.
+      const periodsToPrefetch = ALL_API_PERIODS.filter(
+        (period) => period !== apiPeriod && !dashboardCache[period]
+      )
+      periodsToPrefetch.forEach((period) => {
+        void fetchDashboardData(period, "background")
+      })
+    }
+
+    void run()
     return () => {
-      controller.abort()
+      cancelled = true
+      controllers.forEach((controller) => controller.abort())
     }
   }, [apiPeriod])
 

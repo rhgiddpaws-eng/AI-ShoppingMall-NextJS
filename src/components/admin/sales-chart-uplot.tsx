@@ -10,17 +10,15 @@ import "uplot/dist/uPlot.min.css"
 
 interface SalesDatum {
   name: string
-  // 서버 인코딩 이슈/과거 데이터와 호환되도록 매출 키를 여러 형태로 읽습니다.
+  // 서버 표준 키(sales)를 우선 사용하고, 구버전 키(매출)도 함께 호환합니다.
   sales?: number
   매출?: number
-  "留ㅼ텧"?: number
 }
 
-// sales(신규) → 매출(구버전) → 깨진 키(레거시) 순서로 읽어 배포 전후 데이터를 모두 지원합니다.
+// sales(신규) → 매출(구버전) 순서로 읽어 배포 전후 데이터를 모두 지원합니다.
 const getSalesAmount = (datum: SalesDatum): number => {
   if (typeof datum.sales === "number" && Number.isFinite(datum.sales)) return datum.sales
   if (typeof datum.매출 === "number" && Number.isFinite(datum.매출)) return datum.매출
-  if (typeof datum["留ㅼ텧"] === "number" && Number.isFinite(datum["留ㅼ텧"])) return datum["留ㅼ텧"]
   return 0
 }
 

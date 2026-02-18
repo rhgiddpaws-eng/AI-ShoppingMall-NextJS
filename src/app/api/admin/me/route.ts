@@ -7,6 +7,8 @@ import { getAuthFromRequest } from "@/lib/authFromRequest"
 import prismaClient from "@/lib/prismaClient"
 
 const ADMIN_ROLE = "ADMIN"
+// admin/me도 같은 리전에 배치해 관리자 진입 시 선행 인증 지연을 줄입니다.
+export const preferredRegion = "syd1"
 
 export async function GET(request: Request) {
   const auth = await getAuthFromRequest(request)

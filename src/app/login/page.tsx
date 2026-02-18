@@ -21,7 +21,8 @@ import { toast } from 'sonner'
 
 const loginSchema = z.object({
   email: z.string().min(1, { message: '이메일을 입력해주세요.' }),
-  password: z.string().min(1, { message: '비밀번호를 입력해주세요.' }),
+  // 서버 로그인 검증(6자 이상)과 동일하게 맞춰 클라이언트/서버 검증 결과를 일치시킵니다.
+  password: z.string().min(6, { message: '비밀번호는 6자 이상이어야 합니다.' }),
 })
 
 type LoginForm = z.infer<typeof loginSchema>
@@ -84,8 +85,6 @@ export default function LoginPage() {
       // 그렇지 않으면 이전에 prefetch된 /admin(비로그인 시 리다이렉트) 결과가 쓰여 /로 튕김.
       router.refresh()
       router.push(user?.role === 'ADMIN' ? '/admin' : '/account')
-    } else {
-      toast.error('로그인 실패')
     }
   }
 

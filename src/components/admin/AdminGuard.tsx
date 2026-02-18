@@ -37,17 +37,11 @@ export function AdminGuard({ children }: { children: React.ReactNode }) {
     }
   }, [router])
 
-  if (allowed === null) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <p className="text-muted-foreground">관리자 확인 중...</p>
-      </div>
-    )
-  }
-
-  if (!allowed) {
+  if (allowed === false) {
+    // 권한 없을 때는 즉시 리다이렉트가 걸리므로 빈 화면만 반환합니다.
     return null
   }
 
+  // 권한 확인 전에도 children을 먼저 렌더링해 초기 화면 지연을 줄입니다.
   return <>{children}</>
 }

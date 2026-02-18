@@ -282,11 +282,15 @@ export const useAuthStore = create(
             set({ user: data.user, token: data.token ?? null, isLoading: false })
             return true
           } else {
+            // 서버가 내려준 실패 이유를 바로 보여줘서 로그인 실패 원인을 빠르게 알 수 있게 합니다.
+            toast.error(data.error ?? '로그인에 실패했습니다.')
             set({ user: null, token: null, isLoading: false })
             return false
           }
         } catch (error) {
           console.error('Login failed:', error)
+          // 네트워크 예외도 사용자에게 즉시 안내해 "무반응"처럼 보이지 않게 합니다.
+          toast.error('로그인 요청 중 오류가 발생했습니다.')
           set({ user: null, token: null, isLoading: false })
           return false
         }
@@ -339,6 +343,14 @@ export async function fetchLogin(email: string, password: string) {
   })
   const data = await safeJson<LoginResponse>(response)
   if (!data) {
+    // Vercel 보호 URL에서는 JSON 대신 HTML 401이 내려오므로 접속 도메인을 바꾸도록 안내합니다.
+    if (response.status === 401) {
+      return {
+        ok: false,
+        error:
+          '현재 주소는 접근 보호된 배포 URL입니다. ncott.shop 또는 ai-shopping-mall-next-js.vercel.app로 접속해 주세요.',
+      } as LoginResponse
+    }
     return { ok: false, error: '서버 응답이 올바르지 않습니다.' } as LoginResponse
   }
   return data
