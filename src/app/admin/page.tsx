@@ -19,6 +19,7 @@ const TAB_TO_API_PERIOD = { 일: "week", 월: "month", 년: "year" } as const
 const ALL_API_PERIODS = ["week", "month", "year"] as const
 type TabPeriod = keyof typeof TAB_TO_API_PERIOD
 type ApiPeriod = (typeof TAB_TO_API_PERIOD)[TabPeriod]
+const MIN_DASHBOARD_SKELETON_MS = 400
 
 type DashboardData = {
   period: ApiPeriod
@@ -197,6 +198,8 @@ export default function AdminDashboard() {
     setLoadError(null)
 
     const fetchDashboardData = async (targetPeriod: ApiPeriod, mode: "active" | "background") => {
+      const isInitialActiveLoad = mode === "active" && dashboardData == null
+      const startedAt = Date.now()
       if (inFlightPeriodsRef.current.has(targetPeriod)) return
       if (dashboardCache[targetPeriod]) {
         if (targetPeriod === apiPeriod) {
@@ -247,6 +250,13 @@ export default function AdminDashboard() {
       } finally {
         inFlightPeriodsRef.current.delete(targetPeriod)
         if (!cancelled && mode === "active") {
+          // 첫 진입에서는 스켈레톤이 한 프레임만 보이지 않도록 최소 노출 시간을 보장합니다.
+          if (isInitialActiveLoad) {
+            const elapsed = Date.now() - startedAt
+            if (elapsed < MIN_DASHBOARD_SKELETON_MS) {
+              await new Promise((resolve) => setTimeout(resolve, MIN_DASHBOARD_SKELETON_MS - elapsed))
+            }
+          }
           setLoading(false)
           setIsPeriodLoading(false)
         }

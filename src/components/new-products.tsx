@@ -31,26 +31,38 @@ import { ProductWithImages } from '@/app/api/products/route'
 import { getCdnUrl } from '@/lib/cdn'
 import { safeParseJson } from '@/lib/utils'
 
+// 데이터 응답이 빠른 환경에서도 스켈레톤이 눈에 보이도록 최소 노출 시간을 둡니다.
+const MIN_SKELETON_MS = 350
+
 export function NewProducts() {
   const [products, setProducts] = useState<ProductWithImages[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
+    let cancelled = false
     const fetchProducts = async () => {
+      const startedAt = Date.now()
       try {
         const response = await fetch('/api/products?limit=8')
         const data = await safeParseJson<ProductWithImages[]>(response)
-        if (Array.isArray(data)) setProducts(data)
+        if (Array.isArray(data) && !cancelled) setProducts(data)
         else if (!response.ok) console.error('상품을 불러오는데 실패했습니다:', response.status)
       } catch (error) {
         console.error('상품을 불러오는데 실패했습니다:', error)
       } finally {
         // 응답 성공/실패와 관계없이 로딩 스켈레톤은 종료합니다.
-        setIsLoading(false)
+        const elapsed = Date.now() - startedAt
+        if (elapsed < MIN_SKELETON_MS) {
+          await new Promise((resolve) => setTimeout(resolve, MIN_SKELETON_MS - elapsed))
+        }
+        if (!cancelled) setIsLoading(false)
       }
     }
 
     fetchProducts()
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   if (isLoading) {

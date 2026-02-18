@@ -39,6 +39,9 @@ import { apiRoutes } from '@/lib/apiRoutes'
 import { getCdnUrl } from '@/lib/cdn'
 import { safeParseJson } from '@/lib/utils'
 
+// 네트워크가 너무 빨라도 스켈레톤이 한 프레임만 보이고 사라지지 않도록 최소 노출 시간을 둡니다.
+const MIN_SKELETON_MS = 350
+
 interface ProductData {
   id: number
   name: string
@@ -77,13 +80,15 @@ export function FeaturedProducts() {
 
   // API에서 상품 데이터 가져오기
   useEffect(() => {
+    let cancelled = false
     const fetchProducts = async () => {
+      const startedAt = Date.now()
       try {
         const response = await fetch(
           `${apiRoutes.routes.products.path}?limit=8`,
         )
         if (!response.ok) {
-          setFeaturedProducts([])
+          if (!cancelled) setFeaturedProducts([])
           return
         }
 
@@ -116,17 +121,24 @@ export function FeaturedProducts() {
           }
         })
 
-        setFeaturedProducts(formattedProducts)
+        if (!cancelled) setFeaturedProducts(formattedProducts)
       } catch (error) {
         console.error('상품 데이터 로딩 오류:', error)
         // 오류 발생 시 빈 배열 사용
-        setFeaturedProducts([])
+        if (!cancelled) setFeaturedProducts([])
       } finally {
-        setIsLoading(false)
+        const elapsed = Date.now() - startedAt
+        if (elapsed < MIN_SKELETON_MS) {
+          await new Promise((resolve) => setTimeout(resolve, MIN_SKELETON_MS - elapsed))
+        }
+        if (!cancelled) setIsLoading(false)
       }
     }
 
     fetchProducts()
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   // 반응형 처리를 위한 화면 크기 감지
