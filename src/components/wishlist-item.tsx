@@ -34,6 +34,7 @@ import Link from 'next/link'
 import { ShoppingCart, Trash2 } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
+import { isVideoMediaPath } from '@/lib/media'
 import { useShopStore } from '@/lib/store'
 import { toast } from 'sonner'
 import type { WishlistItem as WishlistItemType } from '@/lib/wishlist'
@@ -44,6 +45,8 @@ interface WishlistItemProps {
 
 export default function WishlistItem({ item }: WishlistItemProps) {
   const { removeFromWishlist, addToCart } = useShopStore()
+  // 위시리스트 썸네일이 동영상이면 <video>로 렌더링합니다.
+  const isVideoMedia = isVideoMediaPath(item.imageSrc)
 
   const handleRemove = () => {
     removeFromWishlist(item.id)
@@ -66,13 +69,26 @@ export default function WishlistItem({ item }: WishlistItemProps) {
   return (
     <div className="flex flex-col sm:flex-row items-start sm:items-center py-4 border-b">
       <div className="flex-shrink-0 w-full sm:w-24 h-24 relative mb-4 sm:mb-0 sm:mr-4">
-        <Image
-          src={item.imageSrc || '/placeholder.svg'}
-          alt={item.name}
-          fill
-          sizes="96px"
-          className="object-cover rounded-md"
-        />
+        {isVideoMedia ? (
+          <video
+            src={item.imageSrc}
+            className="h-full w-full rounded-md object-cover"
+            autoPlay
+            muted
+            loop
+            playsInline
+            preload="metadata"
+            aria-label={`${item.name} 상품 동영상`}
+          />
+        ) : (
+          <Image
+            src={item.imageSrc || '/placeholder.svg'}
+            alt={item.name}
+            fill
+            sizes="96px"
+            className="object-cover rounded-md"
+          />
+        )}
       </div>
 
       <div className="flex-grow">

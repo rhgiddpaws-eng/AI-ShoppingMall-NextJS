@@ -36,6 +36,7 @@ import { Minus, Plus, Trash2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { isVideoMediaPath } from "@/lib/media"
 import { useShopStore } from "@/lib/store"
 import type { CartItem as CartItemType } from "@/lib/cart"
 
@@ -45,6 +46,8 @@ interface CartItemProps {
 
 export default function CartItem({ item }: CartItemProps) {
   const { updateCartItemQuantity, removeFromCart } = useShopStore()
+  // 장바구니 썸네일이 동영상일 수도 있어서 렌더링 타입을 분기합니다.
+  const isVideoMedia = isVideoMediaPath(item.imageSrc)
 
   const handleQuantityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newQuantity = Number.parseInt(e.target.value)
@@ -68,7 +71,26 @@ export default function CartItem({ item }: CartItemProps) {
   return (
     <div className="flex flex-col sm:flex-row items-start sm:items-center py-4 border-b">
       <div className="flex-shrink-0 w-full sm:w-24 h-24 relative mb-4 sm:mb-0 sm:mr-4">
-        <Image src={item.imageSrc || "/placeholder.svg"} alt={item.name} fill sizes="96px" className="object-cover rounded-md" />
+        {isVideoMedia ? (
+          <video
+            src={item.imageSrc}
+            className="h-full w-full rounded-md object-cover"
+            autoPlay
+            muted
+            loop
+            playsInline
+            preload="metadata"
+            aria-label={`${item.name} 상품 동영상`}
+          />
+        ) : (
+          <Image
+            src={item.imageSrc || "/placeholder.svg"}
+            alt={item.name}
+            fill
+            sizes="96px"
+            className="object-cover rounded-md"
+          />
+        )}
       </div>
 
       <div className="flex-grow min-w-0">

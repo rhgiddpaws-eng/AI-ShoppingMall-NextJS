@@ -2,7 +2,7 @@
 
 // =============================================================================
 // 상품 상세 페이지 - /product/[id]
-// 상품 정보 조회, 장바구니/위시리스트 액션, 추천 상품 영역을 제공합니다.
+// 상품 정보 조회, 장바구니/위시리스트 액션, 추천 상품 섹션을 제공합니다.
 // =============================================================================
 
 import { useEffect, useState } from "react"
@@ -17,6 +17,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { apiRoutes } from "@/lib/apiRoutes"
 import { getCdnUrl } from "@/lib/cdn"
+import { isVideoMediaPath } from "@/lib/media"
 import { useShopStore } from "@/lib/store"
 
 type ProductType = {
@@ -32,6 +33,18 @@ type ProductType = {
     original: string
     thumbnail: string
   }[]
+}
+
+/**
+ * 장바구니/위시리스트 미리보기 이미지는 항상 이미지가 우선되도록 계산합니다.
+ * - 원본이 동영상이면 thumbnail을 사용합니다.
+ */
+function getPreviewImageUrl(product: ProductType): string {
+  const first = product.images[0]
+  if (!first) return "/placeholder.svg"
+  if (first.thumbnail) return getCdnUrl(first.thumbnail)
+  if (first.original && !isVideoMediaPath(first.original)) return getCdnUrl(first.original)
+  return "/placeholder.svg"
 }
 
 /**
@@ -90,10 +103,7 @@ export default function ProductPage() {
       id: product.id.toString(),
       name: product.name,
       price: product.price,
-      imageSrc:
-        product.images.length > 0
-          ? getCdnUrl(product.images[0].original)
-          : "/placeholder.svg",
+      imageSrc: getPreviewImageUrl(product),
       quantity: 1,
       category: product.category || "기타",
     })
@@ -117,10 +127,7 @@ export default function ProductPage() {
       id: product.id.toString(),
       name: product.name,
       price: product.price,
-      imageSrc:
-        product.images.length > 0
-          ? getCdnUrl(product.images[0].original)
-          : "/placeholder.svg",
+      imageSrc: getPreviewImageUrl(product),
       category: product.category || "기타",
     })
 
@@ -133,7 +140,7 @@ export default function ProductPage() {
   if (loading) {
     return (
       <div className="container mx-auto px-4 py-8">
-        {/* 상세페이지 로딩 중에도 최종 레이아웃과 비슷한 뼈대를 먼저 보여줍니다. */}
+        {/* 상세페이지 로딩 중에는 최종 레이아웃과 비슷한 스켈레톤을 먼저 보여줍니다. */}
         <div className="mb-4">
           <Skeleton className="h-10 w-10 rounded-md" />
         </div>
@@ -188,13 +195,14 @@ export default function ProductPage() {
     )
   }
 
-  const imageUrl =
-    product.images.length > 0
-      ? getCdnUrl(product.images[0].original)
-      : "/placeholder.svg"
+  const firstMedia = product.images[0]
+  const mediaUrl = firstMedia?.original ? getCdnUrl(firstMedia.original) : "/placeholder.svg"
+  const mediaPosterUrl = firstMedia?.thumbnail ? getCdnUrl(firstMedia.thumbnail) : undefined
 
+  // 동영상 원본이 들어오면 상세 메인 영역에서 자동 재생 비디오로 렌더링합니다.
+  const isVideoMedia = isVideoMediaPath(mediaUrl)
   const isRemoteImage =
-    imageUrl.startsWith("http://") || imageUrl.startsWith("https://")
+    !isVideoMedia && (mediaUrl.startsWith("http://") || mediaUrl.startsWith("https://"))
 
   const finalPrice = product.price * (1 - product.discountRate)
 
@@ -211,21 +219,35 @@ export default function ProductPage() {
       </Button>
 
       <div className="grid gap-8 md:grid-cols-2">
-        <div className="relative aspect-square">
-          <Image
-            src={imageUrl}
-            alt={product.name}
-            fill
-            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-            className="rounded-lg object-cover"
-            priority
-            // 상세 대표 이미지는 CDN 원본을 직접 사용하므로 추가 최적화를 건너뜁니다.
-            unoptimized={isRemoteImage}
-          />
+        <div className="relative aspect-square overflow-hidden rounded-lg bg-muted">
+          {isVideoMedia ? (
+            <video
+              src={mediaUrl}
+              poster={mediaPosterUrl}
+              className="h-full w-full scale-[1.02] object-cover"
+              autoPlay
+              muted
+              loop
+              playsInline
+              preload="metadata"
+              aria-label={`${product.name} 상품 동영상`}
+            />
+          ) : (
+            <Image
+              src={mediaUrl}
+              alt={product.name}
+              fill
+              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+              className="object-cover"
+              priority
+              // 상세 원본 이미지가 CDN 경로일 때 Next 이미지 추가 최적화를 건너뜁니다.
+              unoptimized={isRemoteImage}
+            />
+          )}
         </div>
 
         <div>
-          <h1 className="mb-2 min-w-0 break-words text-2xl font-bold line-clamp-2 sm:text-3xl">
+          <h1 className="mb-2 line-clamp-2 min-w-0 break-words text-2xl font-bold sm:text-3xl">
             {product.name}
           </h1>
 

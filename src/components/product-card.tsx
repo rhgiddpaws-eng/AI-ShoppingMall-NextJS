@@ -11,6 +11,7 @@ import { toast } from "sonner"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { isVideoMediaPath } from "@/lib/media"
 import { warmProductRoute } from "@/lib/route-warmup"
 import { useShopStore } from "@/lib/store"
 import { cn } from "@/lib/utils"
@@ -27,9 +28,9 @@ interface ProductCardProps {
 }
 
 /**
- * 상품 카드입니다.
+ * 상품 카드 컴포넌트입니다.
  * - 상세 이동, 장바구니 담기, 위시리스트 토글을 제공합니다.
- * - 마우스 진입 시 상세 라우트/데이터를 미리 예열합니다.
+ * - 카드 미디어는 이미지/동영상을 확장자로 자동 분기합니다.
  */
 export default function ProductCard({
   id,
@@ -47,10 +48,13 @@ export default function ProductCard({
     useShopStore()
   const [isWishlisted, setIsWishlisted] = useState(false)
 
+  const mediaFallbackSrc = imageSrc || "/placeholder.svg"
   const isRemoteImage =
-    imageSrc.startsWith("http://") || imageSrc.startsWith("https://")
+    mediaFallbackSrc.startsWith("http://") || mediaFallbackSrc.startsWith("https://")
+  // 동영상이면 <video>, 아니면 <Image>를 렌더링합니다.
+  const isVideoMedia = isVideoMediaPath(mediaFallbackSrc)
 
-  // 카드에 마우스/포커스가 닿으면 상세 진입 전에 API를 예열합니다.
+  // 카드에 마우스를 올렸을 때 상세 진입 전에 API를 예열합니다.
   const prefetchProductDetail = () => {
     warmProductRoute(router, id)
   }
@@ -67,7 +71,7 @@ export default function ProductCard({
       id,
       name,
       price: isSale && salePrice ? salePrice : price,
-      imageSrc,
+      imageSrc: mediaFallbackSrc,
       quantity: 1,
       category,
     })
@@ -92,7 +96,7 @@ export default function ProductCard({
       id,
       name,
       price,
-      imageSrc,
+      imageSrc: mediaFallbackSrc,
       category,
       salePrice: isSale ? salePrice : undefined,
     })
@@ -106,7 +110,7 @@ export default function ProductCard({
   return (
     <Link
       href={`/product/${id}`}
-      // 목록 카드가 많을 때 과도한 prefetch 요청이 생기지 않도록 비활성화합니다.
+      // 목록 카드가 많을 때 과도한 prefetch 요청을 막기 위해 비활성화합니다.
       prefetch={false}
       className="group block"
       onMouseEnter={() => {
@@ -119,22 +123,35 @@ export default function ProductCard({
     >
       <div className="relative overflow-hidden rounded-lg">
         <div className="relative aspect-[7/8] w-full rounded-lg border border-gray-200 bg-muted">
-          <Image
-            src={imageSrc || "/placeholder.svg"}
-            alt={name}
-            fill
-            sizes="(min-width: 1024px) 25vw, (min-width: 768px) 33vw, 50vw"
-            className="scale-104 object-cover transition-transform duration-300 group-hover:scale-110"
-            // CDN 경로는 이미 최적화 파일(WebP/썸네일)이라 Next 이미지 최적화를 건너뜁니다.
-            unoptimized={isRemoteImage}
-          />
+          {isVideoMedia ? (
+            <video
+              src={mediaFallbackSrc}
+              className="h-full w-full scale-105 object-cover transition-transform duration-300 group-hover:scale-110"
+              autoPlay
+              muted
+              loop
+              playsInline
+              preload="metadata"
+              aria-label={`${name} 상품 동영상`}
+            />
+          ) : (
+            <Image
+              src={mediaFallbackSrc}
+              alt={name}
+              fill
+              sizes="(min-width: 1024px) 25vw, (min-width: 768px) 33vw, 50vw"
+              className="scale-104 object-cover transition-transform duration-300 group-hover:scale-110"
+              // CDN 경로의 이미지는 이미 최적화된 파일이라 추가 최적화를 생략합니다.
+              unoptimized={isRemoteImage}
+            />
+          )}
 
           <div className="absolute left-2 top-2 flex flex-col gap-1">
             {isNew && (
-              <Badge className="bg-blue-500 hover:bg-blue-500/90">신상품</Badge>
+              <Badge className="bg-blue-500 hover:bg-blue-500/90">신상</Badge>
             )}
             {isSale && (
-              <Badge className="bg-red-500 hover:bg-red-500/90">세일</Badge>
+              <Badge className="bg-red-500 hover:bg-red-500/90">할인</Badge>
             )}
           </div>
 

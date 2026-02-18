@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import { isVideoMediaPath } from '@/lib/media'
 import { useAuthStore, useShopStore } from '@/lib/store'
 import { Separator } from '@/components/ui/separator'
 import { toast } from 'sonner'
@@ -105,11 +106,25 @@ export default function CheckoutPage() {
           <h2 className="text-xl font-semibold mb-4">주문 상품</h2>
           {cart.map(item => (
             <div key={item.id} className="flex items-center mb-4">
-              <img
-                src={item.imageSrc || '/placeholder.svg'}
-                alt={item.name}
-                className="w-16 h-16 object-cover rounded mr-4"
-              />
+              {/* 장바구니 썸네일이 동영상일 수 있어서 이미지/동영상을 분기 렌더링합니다. */}
+              {isVideoMediaPath(item.imageSrc) ? (
+                <video
+                  src={item.imageSrc}
+                  className="w-16 h-16 rounded object-cover mr-4"
+                  autoPlay
+                  muted
+                  loop
+                  playsInline
+                  preload="metadata"
+                  aria-label={`${item.name} 상품 동영상`}
+                />
+              ) : (
+                <img
+                  src={item.imageSrc || '/placeholder.svg'}
+                  alt={item.name}
+                  className="w-16 h-16 object-cover rounded mr-4"
+                />
+              )}
               <div>
                 <h3 className="font-medium">{item.name}</h3>
                 <p className="text-sm text-gray-600">

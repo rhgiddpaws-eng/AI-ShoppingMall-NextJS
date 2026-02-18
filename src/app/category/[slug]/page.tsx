@@ -29,6 +29,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import useInputDebounce from "@/hooks/useInputDebounce"
 import { apiRoutes } from "@/lib/apiRoutes"
 import { getCdnUrl } from "@/lib/cdn"
+import { pickCardMediaKey } from "@/lib/media"
 
 type InfiniteProductsResponse = {
   products: Array<{
@@ -52,8 +53,8 @@ const CATEGORY_LABEL_MAP: Record<string, string> = {
   women: "여성",
   accessories: "액세서리",
   shoes: "신발",
-  sale: "세일",
-  new: "신상품",
+  sale: "할인",
+  new: "신상",
 }
 const CATEGORY_SKELETON_COUNT = 8
 
@@ -151,7 +152,7 @@ export default function CategoryPage() {
     queryFn: fetchProducts,
     getNextPageParam: lastPage => (lastPage?.hasMore ? lastPage.page + 1 : undefined),
     initialPageParam: 1,
-    // 카테고리 재진입 시 매번 재요청하지 않도록 기본 캐시 시간을 지정합니다.
+    // 카테고리 사진은 매번 재요청하지 않도록 기본 캐시 시간을 지정합니다.
     staleTime: 30_000,
     gcTime: 5 * 60_000,
     refetchOnWindowFocus: false,
@@ -160,14 +161,14 @@ export default function CategoryPage() {
 
   useEffect(() => {
     if (inView && hasNextPage && !isFetchingNextPage) {
-      fetchNextPage()
+      void fetchNextPage()
     }
   }, [inView, hasNextPage, isFetchingNextPage, fetchNextPage])
 
   const allProducts = data?.pages.flatMap(page => page?.products ?? []) ?? []
   const titleLabel = CATEGORY_LABEL_MAP[category] ?? `${category} 카테고리`
 
-  // 카테고리 진입 직후에는 스피너 대신 카드 뼈대를 먼저 보여줘 빈 화면 느낌을 줄입니다.
+  // 카테고리 진입 직후에는 스피너 대신 카드 스켈레톤을 먼저 보여줘 빈 화면 체감을 줄입니다.
   if (isLoading && allProducts.length === 0) {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -252,14 +253,8 @@ export default function CategoryPage() {
                 id={product.id.toString()}
                 name={product.name}
                 price={product.price}
-                imageSrc={
-                  // 목록에서는 썸네일을 우선 사용해 초기 렌더 속도를 높입니다.
-                  product?.images[0]?.thumbnail
-                    ? getCdnUrl(product.images[0].thumbnail)
-                    : product?.images[0]?.original
-                      ? getCdnUrl(product.images[0].original)
-                      : "/placeholder.svg?height=400&width=300"
-                }
+                // 원본이 동영상이면 카드에서 동영상이 나오도록 대표 미디어 키를 계산합니다.
+                imageSrc={getCdnUrl(pickCardMediaKey(product.images?.[0]))}
                 category={product.category || "기타"}
               />
             ))}
