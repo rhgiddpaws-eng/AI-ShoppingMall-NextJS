@@ -311,7 +311,14 @@ function filterProductsByCli(products: ProductJsonRow[], options: CliOptions): P
   }
 
   if (options.setNo) {
-    filtered = filtered.filter(product => product.name.includes(`${options.setNo}번 상품`))
+    const targetSetNo = Number(options.setNo)
+    // 한글 문자열 매칭 대신 마지막 숫자를 사용해 세트 번호를 안정적으로 비교합니다.
+    filtered = filtered.filter(product => {
+      const matched = product.name.match(/(\d+)(?!.*\d)/)
+      if (!matched) return false
+      const setNoInName = Number(matched[1])
+      return Number.isFinite(targetSetNo) && setNoInName === targetSetNo
+    })
   }
 
   if (options.limit && options.limit > 0) {

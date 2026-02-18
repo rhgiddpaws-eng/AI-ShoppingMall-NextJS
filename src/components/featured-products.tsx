@@ -2,23 +2,30 @@
 
 /**
  * FeaturedProducts: 메인 추천 상품 캐러셀
- * - 2열(모바일) / 4열(데스크톱) 그리드
- * - 좌우 버튼, 하단 페이지 점 제공
+ * - "2번 상품" 세트를 항상 앞쪽에 고정 노출합니다.
+ * - 나머지 칸은 최신 상품으로 채웁니다.
  */
 
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 
-import { Button } from '@/components/ui/button'
 import ProductCard from '@/components/product-card'
 import { ProductCardSkeleton } from '@/components/product-card-skeleton'
+import { Button } from '@/components/ui/button'
 import { apiRoutes } from '@/lib/apiRoutes'
 import { getCdnUrl } from '@/lib/cdn'
 import { pickCardMediaKey } from '@/lib/media'
+import { isProductInSet, mergePinnedFirst } from '@/lib/product-set'
 import { safeParseJson } from '@/lib/utils'
 
-// 스켈레톤이 너무 짧게 보였다가 깜빡 사라지는 현상을 막기 위한 최소 노출 시간입니다.
+// 스켈레톤이 한 프레임만 보이고 사라지는 깜빡임을 막기 위한 최소 시간입니다.
 const MIN_SKELETON_MS = 350
+// 메인에서 고정 노출할 세트 번호입니다.
+const PINNED_SET_NO = 2
+// 메인 추천 섹션 최대 노출 개수입니다.
+const FEATURED_LIMIT = 8
+// 고정 세트 후보를 찾기 위해 넉넉히 조회합니다.
+const PIN_SOURCE_LIMIT = 100
 
 interface ProductData {
   id: number
@@ -48,6 +55,29 @@ interface FormattedProduct {
   salePrice?: number
 }
 
+/** API 상품 행을 카드 표시용 데이터로 변환합니다. */
+function toFormattedProducts(products: ProductData[]): FormattedProduct[] {
+  const oneWeekAgo = new Date()
+  oneWeekAgo.setDate(oneWeekAgo.getDate() - 7)
+
+  return products.map(product => {
+    const discountAmount = product.price * (product.discountRate / 100)
+    const salePrice = product.price - discountAmount
+
+    return {
+      id: product.id.toString(),
+      name: product.name,
+      price: product.price,
+      // 원본이 동영상이면 동영상 키를 우선 사용해 카드에서 자동 분기 렌더링합니다.
+      imageSrc: getCdnUrl(pickCardMediaKey(product.images?.[0])),
+      category: product.category || '기타',
+      isNew: new Date(product.createdAt) > oneWeekAgo,
+      isSale: product.discountRate > 0,
+      salePrice: product.discountRate > 0 ? salePrice : undefined,
+    }
+  })
+}
+
 export function FeaturedProducts() {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isMobile, setIsMobile] = useState(false)
@@ -56,41 +86,35 @@ export function FeaturedProducts() {
 
   useEffect(() => {
     let cancelled = false
+
     const fetchProducts = async () => {
       const startedAt = Date.now()
       try {
-        const response = await fetch(`${apiRoutes.routes.products.path}?limit=8`)
-        if (!response.ok) {
-          if (!cancelled) setFeaturedProducts([])
-          return
-        }
+        // 최신 목록과 고정 세트 후보를 동시에 가져와서 합성합니다.
+        const [latestResponse, pinSourceResponse] = await Promise.all([
+          fetch(`${apiRoutes.routes.products.path}?limit=${FEATURED_LIMIT}`),
+          fetch(
+            `${apiRoutes.routes.products.path}?limit=${PIN_SOURCE_LIMIT}&sort=id&order=asc`,
+          ),
+        ])
 
-        const raw = await safeParseJson<unknown>(response)
-        const products: ProductData[] = Array.isArray(raw) ? raw : []
+        const latestRaw = await safeParseJson<unknown>(latestResponse)
+        const pinSourceRaw = await safeParseJson<unknown>(pinSourceResponse)
 
-        const oneWeekAgo = new Date()
-        oneWeekAgo.setDate(oneWeekAgo.getDate() - 7)
+        const latestRows: ProductData[] = Array.isArray(latestRaw) ? latestRaw : []
+        const pinSourceRows: ProductData[] = Array.isArray(pinSourceRaw) ? pinSourceRaw : []
 
-        const formattedProducts = products.map(product => {
-          const discountAmount = product.price * (product.discountRate / 100)
-          const salePrice = product.price - discountAmount
+        // 세트 번호를 정확히 파싱해서 12번/22번 오매칭을 방지합니다.
+        const pinnedRows = pinSourceRows.filter(product =>
+          isProductInSet(product.name, PINNED_SET_NO),
+        )
 
-          return {
-            id: product.id.toString(),
-            name: product.name,
-            price: product.price,
-            // 원본이 동영상이면 카드에서도 동영상을 렌더링하기 위해 원본 키를 선택합니다.
-            imageSrc: getCdnUrl(pickCardMediaKey(product.images?.[0])),
-            category: product.category || '기타',
-            isNew: new Date(product.createdAt) > oneWeekAgo,
-            isSale: product.discountRate > 0,
-            salePrice: product.discountRate > 0 ? salePrice : undefined,
-          }
-        })
+        const mergedRows = mergePinnedFirst(pinnedRows, latestRows, FEATURED_LIMIT)
+        const formatted = toFormattedProducts(mergedRows)
 
-        if (!cancelled) setFeaturedProducts(formattedProducts)
+        if (!cancelled) setFeaturedProducts(formatted)
       } catch (error) {
-        console.error('상품 데이터 로딩 오류:', error)
+        console.error('추천 상품 로딩 중 오류:', error)
         if (!cancelled) setFeaturedProducts([])
       } finally {
         const elapsed = Date.now() - startedAt
@@ -114,7 +138,6 @@ export function FeaturedProducts() {
 
     checkScreenSize()
     window.addEventListener('resize', checkScreenSize)
-
     return () => {
       window.removeEventListener('resize', checkScreenSize)
     }
@@ -124,15 +147,11 @@ export function FeaturedProducts() {
   const totalPages = Math.ceil(featuredProducts.length / itemsPerPage)
 
   const nextSlide = () => {
-    setCurrentIndex(prevIndex =>
-      prevIndex === totalPages - 1 ? 0 : prevIndex + 1,
-    )
+    setCurrentIndex(prevIndex => (prevIndex === totalPages - 1 ? 0 : prevIndex + 1))
   }
 
   const prevSlide = () => {
-    setCurrentIndex(prevIndex =>
-      prevIndex === 0 ? totalPages - 1 : prevIndex - 1,
-    )
+    setCurrentIndex(prevIndex => (prevIndex === 0 ? totalPages - 1 : prevIndex - 1))
   }
 
   const visibleProducts = featuredProducts.slice(
@@ -195,9 +214,7 @@ export function FeaturedProducts() {
           <button
             key={index}
             className={`h-2 rounded-full transition-all ${
-              index === currentIndex
-                ? 'w-4 bg-primary'
-                : 'w-2 bg-muted-foreground/30'
+              index === currentIndex ? 'w-4 bg-primary' : 'w-2 bg-muted-foreground/30'
             }`}
             onClick={() => setCurrentIndex(index)}
             aria-label={`페이지 ${index + 1}`}
