@@ -12,6 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Skeleton } from "@/components/ui/skeleton"
 
 /** 탭 값: 일(일별) / 월(월별) / 년(연별) — API period와 명시적 매핑 */
 const TAB_TO_API_PERIOD = { 일: "week", 월: "month", 년: "year" } as const
@@ -57,6 +58,126 @@ type DashboardData = {
     stock: number
     category: string
   }>
+}
+
+/**
+ * 관리자 대시보드 스켈레톤입니다.
+ * - 실제 데이터가 오기 전에도 카드/차트/리스트 틀을 먼저 보여줘
+ *   페이지 진입 시 "빈 화면 + 로딩 스피너" 체감을 줄입니다.
+ */
+function AdminDashboardSkeleton() {
+  return (
+    <div>
+      <Skeleton className="mb-6 h-9 w-36" />
+
+      <div className="mb-6 grid grid-cols-1 gap-6">
+        <Card>
+          <CardHeader className="pb-2">
+            <Skeleton className="h-6 w-24" />
+            <Skeleton className="mt-2 h-9 w-40" />
+          </CardHeader>
+          <CardContent>
+            <Skeleton className="h-[300px] w-full" />
+          </CardContent>
+        </Card>
+
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div className="space-y-2">
+                <Skeleton className="h-6 w-24" />
+                <Skeleton className="h-4 w-20" />
+              </div>
+              <Skeleton className="h-9 w-20" />
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {Array.from({ length: 5 }).map((_, index) => (
+                  <div key={`recent-order-skeleton-${index}`} className="flex items-center justify-between border-b pb-2">
+                    <div className="space-y-2">
+                      <Skeleton className="h-4 w-24" />
+                      <Skeleton className="h-3 w-36" />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Skeleton className="h-6 w-16" />
+                      <Skeleton className="h-4 w-20" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div className="space-y-2">
+                <Skeleton className="h-6 w-28" />
+                <Skeleton className="h-4 w-28" />
+              </div>
+              <Skeleton className="h-9 w-20" />
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {Array.from({ length: 5 }).map((_, index) => (
+                  <div key={`low-stock-skeleton-${index}`} className="flex items-center justify-between border-b pb-2">
+                    <div className="space-y-2">
+                      <Skeleton className="h-4 w-24" />
+                      <Skeleton className="h-3 w-28" />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Skeleton className="h-6 w-20" />
+                      <Skeleton className="h-8 w-8" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      <div className="mb-6 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, index) => (
+          <Card key={`stat-card-skeleton-${index}`}>
+            <CardHeader className="pb-2">
+              <Skeleton className="h-4 w-24" />
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <Skeleton className="h-8 w-24" />
+              <Skeleton className="h-4 w-28" />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      <Card>
+        <CardHeader>
+          <Skeleton className="h-6 w-24" />
+          <Skeleton className="h-4 w-28" />
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 gap-4">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <div key={`order-status-skeleton-${index}`} className="rounded-lg bg-muted/50 p-4">
+                <Skeleton className="mb-2 h-4 w-20" />
+                <Skeleton className="h-8 w-16" />
+              </div>
+            ))}
+          </div>
+          <div className="mt-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-6 w-12" />
+            </div>
+            <div className="flex items-center justify-between">
+              <Skeleton className="h-4 w-20" />
+              <Skeleton className="h-6 w-12" />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
 }
 
 /** 관리자 대시보드: /api/admin/dashboard 데이터로 통계·차트·최근 주문·재고 부족 표시 */
@@ -159,11 +280,7 @@ export default function AdminDashboard() {
   }, [apiPeriod])
 
   if (loading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-      </div>
-    )
+    return <AdminDashboardSkeleton />
   }
 
   if (!dashboardData) {

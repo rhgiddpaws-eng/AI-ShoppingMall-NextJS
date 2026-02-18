@@ -26,12 +26,14 @@
 
 import { useEffect, useState } from 'react'
 import ProductCard from '@/components/product-card'
+import { ProductCardSkeleton } from '@/components/product-card-skeleton'
 import { ProductWithImages } from '@/app/api/products/route'
 import { getCdnUrl } from '@/lib/cdn'
 import { safeParseJson } from '@/lib/utils'
 
 export function NewProducts() {
   const [products, setProducts] = useState<ProductWithImages[]>([])
+  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
     const fetchProducts = async () => {
@@ -42,11 +44,25 @@ export function NewProducts() {
         else if (!response.ok) console.error('상품을 불러오는데 실패했습니다:', response.status)
       } catch (error) {
         console.error('상품을 불러오는데 실패했습니다:', error)
+      } finally {
+        // 응답 성공/실패와 관계없이 로딩 스켈레톤은 종료합니다.
+        setIsLoading(false)
       }
     }
 
     fetchProducts()
   }, [])
+
+  if (isLoading) {
+    // 신상품 데이터가 아직 없어도 동일한 카드 틀을 먼저 보여줍니다.
+    return (
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 md:gap-6">
+        {Array.from({ length: 8 }).map((_, index) => (
+          <ProductCardSkeleton key={`new-skeleton-${index}`} />
+        ))}
+      </div>
+    )
+  }
 
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">

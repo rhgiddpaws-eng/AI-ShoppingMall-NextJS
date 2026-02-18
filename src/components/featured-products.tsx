@@ -34,10 +34,10 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import ProductCard from '@/components/product-card'
+import { ProductCardSkeleton } from '@/components/product-card-skeleton'
 import { apiRoutes } from '@/lib/apiRoutes'
 import { getCdnUrl } from '@/lib/cdn'
 import { safeParseJson } from '@/lib/utils'
-import { LoadingSpinner } from '@/components/ui/loading-spinner'
 
 interface ProductData {
   id: number
@@ -163,11 +163,15 @@ export function FeaturedProducts() {
     (currentIndex + 1) * itemsPerPage,
   )
 
-  // 로딩 상태 표시
+  // 로딩 중에도 카드 틀을 먼저 보여줘 화면이 비어 보이지 않게 합니다.
   if (isLoading) {
     return (
-      <div className="py-10">
-        <LoadingSpinner size={26} label="상품을 불러오는 중" />
+      <div className="relative">
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-4 md:gap-6">
+          {Array.from({ length: itemsPerPage }).map((_, index) => (
+            <ProductCardSkeleton key={`featured-skeleton-${index}`} />
+          ))}
+        </div>
       </div>
     )
   }
