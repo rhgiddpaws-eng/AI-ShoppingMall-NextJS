@@ -64,10 +64,6 @@ export async function GET(request: NextRequest) {
   const order = orderRaw === "asc" || orderRaw === "desc" ? orderRaw : "desc"
   const parsedLimit = parseInt(limitRaw, 10)
   const take = Number.isNaN(parsedLimit) || parsedLimit < 1 ? 20 : Math.min(parsedLimit, 100)
-  // 기본값을 영상 전용으로 두어 카테고리/메인 카드가 항상 동영상 상품을 우선 노출하게 합니다.
-  const videoOnlyRaw = searchParams.get("videoOnly")
-  const isVideoOnly =
-    videoOnlyRaw == null ? true : videoOnlyRaw === "1" || videoOnlyRaw.toLowerCase() === "true"
 
   // slug가 new인 경우는 카테고리 필터 없이 최신 전체를 보여줍니다.
   const isNewCategory = category === "NEW"
@@ -77,10 +73,6 @@ export async function GET(request: NextRequest) {
       where: {
         status: "PUBLISHED" as const,
         ...(category != null && !isNewCategory && { category }),
-        ...(isVideoOnly && {
-          // 이미지 전용 상품을 제외하고, 동영상 미디어가 있는 상품만 목록에 포함합니다.
-          images: { some: { mediaType: "video" as const } },
-        }),
         ...(term && {
           name: {
             contains: term,

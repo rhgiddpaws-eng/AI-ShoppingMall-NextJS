@@ -50,8 +50,6 @@ async function findFallbackProducts(excludeId: number, categoryValue: string | n
   const wherePrimary: Record<string, unknown> = {
     status: "PUBLISHED",
     id: { not: excludeId },
-    // 추천 카드도 영상 전용 정책을 맞추기 위해 동영상 미디어가 있는 상품만 선택합니다.
-    images: { some: { mediaType: "video" } },
   }
   if (categoryValue) {
     // category enum과 문자열 타입 충돌을 피하기 위해 런타임 값만 주입합니다.
@@ -89,8 +87,6 @@ async function findFallbackProducts(excludeId: number, categoryValue: string | n
     where: {
       status: "PUBLISHED",
       id: { notIn: [excludeId, ...existingIds] },
-      // 2차 fallback도 영상 전용으로 유지합니다.
-      images: { some: { mediaType: "video" } },
     },
     select: {
       id: true,
@@ -162,12 +158,6 @@ export async function GET(request: Request) {
       WHERE p."id" <> ${excludeId}
         AND p."status" = 'PUBLISHED'
         AND p."vector" IS NOT NULL
-        AND EXISTS (
-          SELECT 1
-          FROM "Image" i
-          WHERE i."productId" = p."id"
-            AND i."mediaType" = 'video'
-        )
       ORDER BY p."vector" <=> t."vector" ASC
       LIMIT 4
     `
@@ -178,8 +168,6 @@ export async function GET(request: Request) {
         where: {
           id: { in: orderedIds },
           status: "PUBLISHED",
-          // 벡터 추천 결과도 영상이 있는 상품만 최종 노출합니다.
-          images: { some: { mediaType: "video" } },
         },
         select: {
           id: true,
