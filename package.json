@@ -15,6 +15,7 @@
     "download-clone-images": "node scripts/download-pexels-by-category.js",
     "upscale-all": "node scripts/upscale-all-to-high-quality.js",
     "audit-images": "node scripts/audit-image-quality.js",
+    "optimize-hero-video": "node scripts/optimize-hero-video.js",
     "migrate": "npx dotenv-cli -e .env -- prisma migrate dev",
     "migrate:reset": "npx dotenv-cli -e .env -- prisma migrate reset",
     "seed": "npx dotenv-cli -e .env -- prisma db seed",
