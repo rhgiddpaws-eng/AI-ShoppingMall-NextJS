@@ -58,6 +58,16 @@ export default function ProductCard({
   // 세로형 룩북 영상이 잘리지 않도록 영상 카드 비율을 더 세로로 잡습니다.
   // 메인/카테고리/추천 카드 높이가 들쭉날쭉해지지 않도록 비율을 통일합니다.
   const mediaAspectClass = "aspect-[7/8]"
+  // 일부 브라우저에서 자동재생이 지연될 수 있어, 미디어 로드 직후 한 번 더 재생을 시도합니다.
+  const handleVideoReady = (event: React.SyntheticEvent<HTMLVideoElement>) => {
+    const videoElement = event.currentTarget
+    const playPromise = videoElement.play()
+    if (playPromise) {
+      void playPromise.catch(() => {
+        // 자동재생이 막힌 환경에서는 정지 프레임을 유지하고 사용자 상호작용 시 재생합니다.
+      })
+    }
+  }
 
   // 카드에 마우스를 올렸을 때 상세 진입 전에 API를 예열합니다.
   const prefetchProductDetail = () => {
@@ -136,8 +146,9 @@ export default function ProductCard({
               muted
               loop
               playsInline
-              // 카드 다수 렌더 시 초기 버벅임을 줄이기 위해 메타데이터만 먼저 불러옵니다.
-              preload="none"
+              // 카드가 보일 때 재생이 바로 시작되도록 최소 메타데이터를 먼저 읽어옵니다.
+              preload="metadata"
+              onLoadedData={handleVideoReady}
               aria-label={`${name} 상품 동영상`}
             />
           ) : (

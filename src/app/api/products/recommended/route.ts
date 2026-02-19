@@ -46,10 +46,17 @@ function toRecommendedItem(product: ProductWithImage) {
   }
 }
 
-async function findFallbackProducts(excludeId: number, categoryValue: string | null, limit = 4) {
+async function findFallbackProducts(
+  excludeId: number,
+  categoryValue: string | null,
+  limit = 4,
+  excludedIds: number[] = [],
+) {
+  // 이미 뽑힌 추천 상품과 현재 상품은 fallback에서 중복되지 않게 제외합니다.
+  const baseExcludedIds = [excludeId, ...excludedIds]
   const wherePrimary: Record<string, unknown> = {
     status: "PUBLISHED",
-    id: { not: excludeId },
+    id: { notIn: baseExcludedIds },
   }
   if (categoryValue) {
     // category enum과 문자열 타입 충돌을 피하기 위해 런타임 값만 주입합니다.
@@ -86,7 +93,7 @@ async function findFallbackProducts(excludeId: number, categoryValue: string | n
   const secondary = await prismaClient.product.findMany({
     where: {
       status: "PUBLISHED",
-      id: { notIn: [excludeId, ...existingIds] },
+      id: { notIn: [...baseExcludedIds, ...existingIds] },
     },
     select: {
       id: true,
@@ -168,6 +175,8 @@ export async function GET(request: Request) {
         where: {
           id: { in: orderedIds },
           status: "PUBLISHED",
+          // 여성 상세에서 남성 추천이 섞이지 않도록, 현재 상품 카테고리를 우선 유지합니다.
+          ...(currentCategory != null && { category: currentCategory }),
         },
         select: {
           id: true,
@@ -195,12 +204,26 @@ export async function GET(request: Request) {
         return product ? [product] : []
       })
 
-      return NextResponse.json(orderedProducts.map(toRecommendedItem), {
-        headers: {
-          // 추천 카드 재조회는 짧게 캐시해서 상세 페이지 왕복 지연을 줄입니다.
-          "Cache-Control": PRODUCT_RECOMMENDED_CACHE_CONTROL,
-        },
-      })
+      // 벡터 결과가 부족하면 같은 카테고리 fallback으로 남은 칸을 채웁니다.
+      if (orderedProducts.length > 0) {
+        let mergedProducts = orderedProducts
+        if (orderedProducts.length < 4) {
+          const fillProducts = await findFallbackProducts(
+            excludeId,
+            currentCategory,
+            4 - orderedProducts.length,
+            orderedProducts.map(product => product.id),
+          )
+          mergedProducts = [...orderedProducts, ...fillProducts]
+        }
+
+        return NextResponse.json(mergedProducts.slice(0, 4).map(toRecommendedItem), {
+          headers: {
+            // 추천 카드 재조회는 짧게 캐시해서 상세 페이지 왕복 지연을 줄입니다.
+            "Cache-Control": PRODUCT_RECOMMENDED_CACHE_CONTROL,
+          },
+        })
+      }
     }
 
     const fallbackProducts = await findFallbackProducts(excludeId, currentCategory, 4)
