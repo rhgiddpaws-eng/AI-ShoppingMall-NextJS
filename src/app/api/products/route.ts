@@ -91,7 +91,8 @@ export async function GET(request: NextRequest) {
         createdAt: true,
         images: {
           take: 1,
-          orderBy: { id: "asc" },
+          // 동영상이 있으면 카드에서 항상 동영상이 먼저 보이도록 우선 정렬합니다.
+          orderBy: [{ mediaType: "desc" }, { id: "asc" }],
           select: {
             id: true,
             original: true,

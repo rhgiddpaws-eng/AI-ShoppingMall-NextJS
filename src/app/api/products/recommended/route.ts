@@ -65,7 +65,8 @@ async function findFallbackProducts(excludeId: number, categoryValue: string | n
       category: true,
       images: {
         take: 1,
-        orderBy: { id: "asc" },
+        // 동영상이 있으면 추천 카드에서도 동영상이 먼저 보이도록 정렬합니다.
+        orderBy: [{ mediaType: "desc" }, { id: "asc" }],
         select: {
           id: true,
           original: true,
@@ -94,7 +95,8 @@ async function findFallbackProducts(excludeId: number, categoryValue: string | n
       category: true,
       images: {
         take: 1,
-        orderBy: { id: "asc" },
+        // 동영상이 있으면 추천 카드에서도 동영상이 먼저 보이도록 정렬합니다.
+        orderBy: [{ mediaType: "desc" }, { id: "asc" }],
         select: {
           id: true,
           original: true,
@@ -174,7 +176,8 @@ export async function GET(request: Request) {
           category: true,
           images: {
             take: 1,
-            orderBy: { id: "asc" },
+            // 동영상이 있으면 추천 카드에서도 동영상이 먼저 보이도록 정렬합니다.
+            orderBy: [{ mediaType: "desc" }, { id: "asc" }],
             select: {
               id: true,
               original: true,

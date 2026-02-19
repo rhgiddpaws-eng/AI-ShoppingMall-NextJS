@@ -41,7 +41,8 @@ type ProductType = {
  * - 원본이 동영상이면 thumbnail을 사용합니다.
  */
 function getPreviewImageUrl(product: ProductType): string {
-  const first = product.images[0]
+  // 동영상이 있으면 동영상 행을 우선 선택해서 썸네일/원본 키를 일관되게 맞춥니다.
+  const first = product.images.find(media => isVideoMediaType(media.mediaType)) ?? product.images[0]
   if (!first) return "/placeholder.svg"
   // DB mediaType이 image이면 썸네일을 우선 사용해 리스트 렌더링 비용을 줄입니다.
   if (first.thumbnail && !isVideoMediaType(first.mediaType)) return getCdnUrl(first.thumbnail)
@@ -204,7 +205,8 @@ export default function ProductPage() {
     )
   }
 
-  const firstMedia = product.images[0]
+  // 상세 메인 미디어는 동영상이 있으면 항상 동영상을 우선 사용합니다.
+  const firstMedia = product.images.find(media => isVideoMediaType(media.mediaType)) ?? product.images[0]
   const mediaUrl = firstMedia?.original ? getCdnUrl(firstMedia.original) : "/placeholder.svg"
   const mediaPosterUrl = firstMedia?.thumbnail ? getCdnUrl(firstMedia.thumbnail) : undefined
 

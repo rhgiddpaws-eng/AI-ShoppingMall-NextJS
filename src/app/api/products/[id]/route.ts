@@ -38,7 +38,8 @@ export async function GET(
         discountRate: true,
         category: true,
         images: {
-          orderBy: { id: "asc" },
+          // 상세의 기본 미디어도 동영상이 있으면 항상 먼저 오도록 정렬합니다.
+          orderBy: [{ mediaType: "desc" }, { id: "asc" }],
           select: {
             id: true,
             original: true,
