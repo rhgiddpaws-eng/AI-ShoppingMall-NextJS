@@ -36,6 +36,10 @@ export async function GET(request: NextRequest) {
   const sortRaw = searchParams.get("sort") || "createdAt"
   const orderRaw = searchParams.get("order") || "desc"
   const term = (searchParams.get("term") || "").trim()
+  // 기본값을 영상 전용으로 두어 무한 스크롤 구간에서도 이미지 전용 상품이 섞이지 않게 합니다.
+  const videoOnlyRaw = searchParams.get("videoOnly")
+  const isVideoOnly =
+    videoOnlyRaw == null ? true : videoOnlyRaw === "1" || videoOnlyRaw.toLowerCase() === "true"
 
   const sort = ALLOWED_SORT_KEYS.includes(sortRaw as (typeof ALLOWED_SORT_KEYS)[number])
     ? sortRaw
@@ -48,6 +52,10 @@ export async function GET(request: NextRequest) {
   const where = {
     status: "PUBLISHED" as const,
     ...(category != null && !isNewCategory && { category }),
+    ...(isVideoOnly && {
+      // 이미지 전용 상품을 제외하고, 동영상 미디어가 있는 상품만 목록에 포함합니다.
+      images: { some: { mediaType: "video" as const } },
+    }),
     ...(term.length > 0 && {
       name: {
         contains: term,
