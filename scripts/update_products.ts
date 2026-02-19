@@ -10,6 +10,9 @@ import sharp from 'sharp'
 import { loadEnvConfig } from '@next/env'
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
 import { randomUUID } from 'crypto'
+import os from 'os'
+import { spawnSync } from 'child_process'
+import ffmpegInstaller from '@ffmpeg-installer/ffmpeg'
 
 loadEnvConfig(process.cwd())
 
@@ -49,6 +52,13 @@ type CliOptions = {
   nameContains?: string
   setNo?: string
   limit?: number
+  useFfmpeg?: boolean
+  ffmpegRequired?: boolean
+}
+
+type VideoPipelineOptions = {
+  useFfmpeg: boolean
+  ffmpegPath: string | null
 }
 
 /**
@@ -62,6 +72,22 @@ function parseCliOptions(): CliOptions {
   const options: CliOptions = {}
 
   for (const arg of args) {
+    if (arg === '--ffmpeg') {
+      // 동영상을 웹용(mp4)으로 변환해서 업로드합니다.
+      options.useFfmpeg = true
+      continue
+    }
+    if (arg === '--no-ffmpeg') {
+      // ffmpeg 변환 없이 원본 파일을 그대로 업로드합니다.
+      options.useFfmpeg = false
+      continue
+    }
+    if (arg === '--ffmpeg-required') {
+      // ffmpeg가 없으면 바로 실패하게 해서 품질을 강제합니다.
+      options.useFfmpeg = true
+      options.ffmpegRequired = true
+      continue
+    }
     if (arg.startsWith('--name-exact=')) {
       options.nameExact = arg.replace('--name-exact=', '').trim()
       continue
@@ -112,6 +138,143 @@ function getVideoContentType(filePath: string): string {
 function hasExtension(fileKey: string | undefined | null, ext: string): boolean {
   if (!fileKey) return false
   return fileKey.toLowerCase().endsWith(ext)
+}
+
+/** ffmpeg 실행 파일 경로를 안전하게 가져옵니다. */
+function getFfmpegPath(): string | null {
+  if (typeof ffmpegInstaller?.path === 'string' && ffmpegInstaller.path.length > 0) {
+    return ffmpegInstaller.path
+  }
+  return null
+}
+
+/** ffmpeg 실행 가능 여부를 빠르게 확인합니다. */
+function isFfmpegAvailable(ffmpegPath: string | null): boolean {
+  if (!ffmpegPath) return false
+  const result = spawnSync(ffmpegPath, ['-version'], {
+    stdio: 'ignore',
+    windowsHide: true,
+  })
+  return result.status === 0
+}
+
+/** CLI 옵션과 환경을 기준으로 영상 변환 파이프라인 사용 여부를 결정합니다. */
+function resolveVideoPipelineOptions(options: CliOptions): VideoPipelineOptions {
+  const ffmpegPath = getFfmpegPath()
+  const requestedFfmpeg = options.useFfmpeg ?? true
+  const available = isFfmpegAvailable(ffmpegPath)
+
+  if (!requestedFfmpeg) {
+    console.log('[VIDEO] --no-ffmpeg 옵션으로 원본 동영상을 그대로 업로드합니다.')
+    return { useFfmpeg: false, ffmpegPath: null }
+  }
+
+  if (!available) {
+    if (options.ffmpegRequired) {
+      throw new Error(
+        'ffmpeg 실행 파일을 찾을 수 없습니다. --ffmpeg-required 옵션으로 실행되어 작업을 중단합니다.',
+      )
+    }
+    console.warn(
+      '[VIDEO] ffmpeg를 사용할 수 없어 원본 동영상을 업로드합니다. (필요하면 --ffmpeg-required로 강제 실패 가능)',
+    )
+    return { useFfmpeg: false, ffmpegPath: null }
+  }
+
+  console.log('[VIDEO] ffmpeg 웹용 변환(mp4 + faststart + 24fps)을 사용합니다.')
+  return { useFfmpeg: true, ffmpegPath }
+}
+
+/**
+ * 신규 키를 만들 때 상품/슬롯/미디어 타입별 고정 경로를 사용합니다.
+ * - 같은 슬롯에 같은 포맷이면 다음 실행에서도 동일 키를 재사용합니다.
+ * - 이미지/동영상을 경로에서 분리해 S3 구조가 헷갈리지 않게 합니다.
+ */
+function buildSlotMediaKey(
+  productId: number,
+  slotIndex: number,
+  mediaType: 'image' | 'video',
+  kind: 'original' | 'thumbnail',
+  extWithDot: string,
+): string {
+  const slotNo = String(slotIndex + 1).padStart(2, '0')
+  const mediaFolder = mediaType === 'video' ? 'video' : 'image'
+  return `ecommerce/products/p${productId}/slot-${slotNo}/${mediaFolder}/${kind}${extWithDot}`
+}
+
+/** ffmpeg 명령을 실행하고 실패 시 stderr를 함께 출력합니다. */
+function runFfmpeg(ffmpegPath: string, args: string[], label: string): boolean {
+  const result = spawnSync(ffmpegPath, args, {
+    encoding: 'utf8',
+    windowsHide: true,
+  })
+  if (result.status === 0) return true
+
+  const stderr = result.stderr?.toString().trim()
+  console.error(`[FFMPEG] ${label} 실패`, stderr || '(stderr 없음)')
+  return false
+}
+
+/**
+ * 동영상을 웹용 mp4로 변환하고, 포스터 썸네일(webp 원본 버퍼)을 함께 준비합니다.
+ * - 변환 실패 시 null을 반환해 호출부에서 원본 업로드로 자동 폴백합니다.
+ */
+async function transcodeVideoForWeb(
+  sourceVideoPath: string,
+  ffmpegPath: string,
+): Promise<{
+  videoBuffer: Buffer
+  videoExt: string
+  contentType: string
+  posterBuffer: Buffer | null
+} | null> {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'product-video-'))
+  const transcodedPath = path.join(tempDir, `${randomUUID()}.mp4`)
+
+  try {
+    const transcodeOk = runFfmpeg(
+      ffmpegPath,
+      [
+        '-y',
+        '-i',
+        sourceVideoPath,
+        '-vf',
+        'scale=720:1280:force_original_aspect_ratio=decrease,fps=24,scale=trunc(iw/2)*2:trunc(ih/2)*2',
+        '-c:v',
+        'libx264',
+        '-preset',
+        'veryfast',
+        '-crf',
+        '27',
+        '-pix_fmt',
+        'yuv420p',
+        '-movflags',
+        '+faststart',
+        '-an',
+        transcodedPath,
+      ],
+      'video transcode',
+    )
+
+    if (!transcodeOk || !fs.existsSync(transcodedPath)) {
+      return null
+    }
+
+    return {
+      videoBuffer: fs.readFileSync(transcodedPath),
+      videoExt: '.mp4',
+      contentType: 'video/mp4',
+      // 포스터는 같은 이름 이미지(예: 1.png)를 우선 사용하고, 없으면 업로드 단계에서 원본으로 대체합니다.
+      posterBuffer: null,
+    }
+  } finally {
+    try {
+      // Windows에서 파일 핸들이 늦게 해제될 수 있어 정리 실패는 경고만 남기고 계속 진행합니다.
+      fs.rmSync(tempDir, { recursive: true, force: true })
+    } catch (cleanupError) {
+      console.warn('[FFMPEG] 임시 파일 정리 실패(무시):', cleanupError)
+    }
+  }
 }
 
 /** 경로 정규화 없이 S3에 버퍼를 업로드합니다. */
@@ -166,6 +329,8 @@ function findPosterImagePathForVideo(videoPath: string): string | null {
  */
 async function processAndUploadImage(
   imagePath: string,
+  productId: number,
+  slotIndex: number,
   existingKeys?: ExistingKeys,
 ): Promise<MediaUploadResult> {
   try {
@@ -177,15 +342,15 @@ async function processAndUploadImage(
 
     const originalKey = hasExtension(existingKeys?.original, '.webp')
       ? existingKeys!.original
-      : `ecommerce/products/${randomUUID()}.webp`
+      : buildSlotMediaKey(productId, slotIndex, 'image', 'original', '.webp')
 
     let thumbnailKey = hasExtension(existingKeys?.thumbnail, '.webp')
       ? existingKeys!.thumbnail
-      : `ecommerce/products/${randomUUID()}.webp`
+      : buildSlotMediaKey(productId, slotIndex, 'image', 'thumbnail', '.webp')
 
     // original/thumbnail 키가 같으면 썸네일 업로드가 원본을 덮을 수 있어 분리합니다.
     if (thumbnailKey === originalKey) {
-      thumbnailKey = `ecommerce/products/${randomUUID()}.webp`
+      thumbnailKey = buildSlotMediaKey(productId, slotIndex, 'image', 'thumbnail', '.webp')
     }
 
     await Promise.all([
@@ -208,34 +373,55 @@ async function processAndUploadImage(
  */
 async function processAndUploadVideo(
   videoPath: string,
+  productId: number,
+  slotIndex: number,
+  videoPipelineOptions: VideoPipelineOptions,
   existingKeys?: ExistingKeys,
 ): Promise<MediaUploadResult> {
   try {
-    const videoBuffer = fs.readFileSync(videoPath)
-    const ext = getExt(videoPath)
-    const contentType = getVideoContentType(videoPath)
+    let videoBuffer = fs.readFileSync(videoPath)
+    let ext = getExt(videoPath)
+    let contentType = getVideoContentType(videoPath)
+    let posterBufferFromVideo: Buffer | null = null
+
+    if (videoPipelineOptions.useFfmpeg && videoPipelineOptions.ffmpegPath) {
+      const transcoded = await transcodeVideoForWeb(videoPath, videoPipelineOptions.ffmpegPath)
+      if (transcoded) {
+        // ffmpeg 변환이 성공하면 웹용 mp4를 업로드해 초기 재생 지연을 줄입니다.
+        videoBuffer = transcoded.videoBuffer
+        ext = transcoded.videoExt
+        contentType = transcoded.contentType
+        posterBufferFromVideo = transcoded.posterBuffer
+      }
+    }
 
     // 동영상으로 바뀐 경우 확장자가 맞는 새 키를 발급해 Content-Type/확장자 불일치를 막습니다.
     const originalKey = hasExtension(existingKeys?.original, ext)
       ? existingKeys!.original
-      : `ecommerce/products/${randomUUID()}${ext}`
+      : buildSlotMediaKey(productId, slotIndex, 'video', 'original', ext)
 
     await uploadToS3(videoBuffer, originalKey, contentType)
 
     let thumbnailKey: string | null = existingKeys?.thumbnail ?? null
+    let thumbnailBufferToUpload: Buffer | null = null
     const posterImagePath = findPosterImagePathForVideo(videoPath)
 
     if (posterImagePath && isImageFile(posterImagePath)) {
-      const thumbnailBuffer = await sharp(posterImagePath)
+      thumbnailBufferToUpload = await sharp(posterImagePath)
         .resize(300)
         .webp({ quality: 70 })
         .toBuffer()
+    } else if (posterBufferFromVideo) {
+      // 같은 이름 포스터가 없으면 ffmpeg 추출 프레임을 썸네일로 사용합니다.
+      thumbnailBufferToUpload = posterBufferFromVideo
+    }
 
+    if (thumbnailBufferToUpload) {
       thumbnailKey = hasExtension(existingKeys?.thumbnail, '.webp')
         ? existingKeys!.thumbnail
-        : `ecommerce/products/${randomUUID()}.webp`
+        : buildSlotMediaKey(productId, slotIndex, 'video', 'thumbnail', '.webp')
 
-      await uploadToS3(thumbnailBuffer, thumbnailKey, 'image/webp')
+      await uploadToS3(thumbnailBufferToUpload, thumbnailKey, 'image/webp')
     }
 
     if (!thumbnailKey) {
@@ -252,12 +438,15 @@ async function processAndUploadVideo(
 /** 파일 타입을 자동 분기해 S3 업로드를 수행합니다. */
 async function processAndUploadMedia(
   mediaPath: string,
+  productId: number,
+  slotIndex: number,
+  videoPipelineOptions: VideoPipelineOptions,
   existingKeys?: ExistingKeys,
 ): Promise<MediaUploadResult> {
   if (isVideoFile(mediaPath)) {
-    return processAndUploadVideo(mediaPath, existingKeys)
+    return processAndUploadVideo(mediaPath, productId, slotIndex, videoPipelineOptions, existingKeys)
   }
-  return processAndUploadImage(mediaPath, existingKeys)
+  return processAndUploadImage(mediaPath, productId, slotIndex, existingKeys)
 }
 
 /** OpenAI 임베딩을 생성합니다. */
@@ -334,6 +523,7 @@ function filterProductsByCli(products: ProductJsonRow[], options: CliOptions): P
 
 async function main() {
   const options = parseCliOptions()
+  const videoPipelineOptions = resolveVideoPipelineOptions(options)
 
   try {
     const productsFilePath = path.join(__dirname, 'products', 'updated_products.json')
@@ -432,6 +622,9 @@ async function main() {
 
             const { originalKey, thumbnailKey, mediaType } = await processAndUploadMedia(
               fullMediaPath,
+              existingProduct.id,
+              j,
+              videoPipelineOptions,
               targetKeys,
             )
 
