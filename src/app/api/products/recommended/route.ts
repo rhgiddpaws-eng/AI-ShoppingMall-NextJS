@@ -15,6 +15,8 @@ export const preferredRegion = "syd1"
 export const dynamic = "force-dynamic"
 // 라우트 재검증 캐시를 비활성화합니다.
 export const revalidate = 0
+// 추천 목록은 짧은 시간만 캐시해 상세 이동 반복 시 체감 속도를 높입니다.
+const PRODUCT_RECOMMENDED_CACHE_CONTROL = "public, s-maxage=30, stale-while-revalidate=300"
 
 type SimilarRow = {
   id: number
@@ -192,8 +194,8 @@ export async function GET(request: Request) {
 
       return NextResponse.json(orderedProducts.map(toRecommendedItem), {
         headers: {
-          // 비로그인/로그인 상관없이 최신 추천 미디어 키를 받도록 no-store를 사용합니다.
-          "Cache-Control": "no-store",
+          // 추천 카드 재조회는 짧게 캐시해서 상세 페이지 왕복 지연을 줄입니다.
+          "Cache-Control": PRODUCT_RECOMMENDED_CACHE_CONTROL,
         },
       })
     }
@@ -201,8 +203,8 @@ export async function GET(request: Request) {
     const fallbackProducts = await findFallbackProducts(excludeId, currentCategory, 4)
     return NextResponse.json(fallbackProducts.map(toRecommendedItem), {
       headers: {
-        // fallback 경로도 동일하게 최신 응답을 우선합니다.
-        "Cache-Control": "no-store",
+        // fallback 결과도 동일한 짧은 캐시 정책을 유지합니다.
+        "Cache-Control": PRODUCT_RECOMMENDED_CACHE_CONTROL,
       },
     })
   } catch (error) {
@@ -213,16 +215,16 @@ export async function GET(request: Request) {
       const safeFallback = await findFallbackProducts(excludeId, currentCategory, 4)
       return NextResponse.json(safeFallback.map(toRecommendedItem), {
         headers: {
-          // 오류 복구 시에도 오래된 캐시가 남지 않도록 no-store를 유지합니다.
-          "Cache-Control": "no-store",
+          // 오류 복구 응답도 같은 캐시 정책으로 재요청 부담을 줄입니다.
+          "Cache-Control": PRODUCT_RECOMMENDED_CACHE_CONTROL,
         },
       })
     } catch (fallbackError) {
       console.error("추천 상품 fallback 조회 오류:", fallbackError)
       return NextResponse.json([], {
         headers: {
-          // 최종 fallback도 최신성 우선 정책을 동일하게 적용합니다.
-          "Cache-Control": "no-store",
+          // 빈 결과도 짧은 캐시를 둬 연속 실패 시 지연을 완화합니다.
+          "Cache-Control": PRODUCT_RECOMMENDED_CACHE_CONTROL,
         },
       })
     }

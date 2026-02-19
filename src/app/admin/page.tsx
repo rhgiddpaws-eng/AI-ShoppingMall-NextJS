@@ -224,8 +224,8 @@ export default function AdminDashboard() {
       }
 
       try {
+        // 관리자 대시보드는 서버/브라우저의 짧은 캐시를 활용해 탭 전환 지연을 줄입니다.
         const response = await fetch(`/api/admin/dashboard?period=${targetPeriod}`, {
-          cache: "no-store",
           signal: controller.signal
         })
         if (!response.ok) {

@@ -428,6 +428,8 @@ async function getDashboardData(period: DashboardPeriod) {
 
 type DashboardResponse = Awaited<ReturnType<typeof getDashboardData>>
 const DASHBOARD_CACHE_TTL_MS = 60 * 1000
+// 관리자 데이터는 사용자별 응답이므로 private 캐시로 짧게만 재사용합니다.
+const ADMIN_DASHBOARD_CACHE_CONTROL = "private, max-age=20, stale-while-revalidate=40"
 let dashboardCache:
   | {
     expiresAt: number
@@ -451,11 +453,14 @@ export async function GET(request: Request) {
 
   const cached = dashboardCache.dataByPeriod[validPeriod]
   if (cached) {
-    return NextResponse.json(cached, { headers: { "Cache-Control": "no-store" } })
+    return NextResponse.json(cached, {
+      headers: { "Cache-Control": ADMIN_DASHBOARD_CACHE_CONTROL },
+    })
   }
 
   const dashboardData = await getDashboardData(validPeriod)
   dashboardCache.dataByPeriod[validPeriod] = dashboardData
-  return NextResponse.json(dashboardData)
+  return NextResponse.json(dashboardData, {
+    headers: { "Cache-Control": ADMIN_DASHBOARD_CACHE_CONTROL },
+  })
 }
-

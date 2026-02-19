@@ -37,17 +37,9 @@ export function NewProducts() {
       try {
         // 최신 목록 + 고정 세트 후보를 함께 조회해 메인 노출 순서를 재구성합니다.
         const [latestResponse, pinSourceResponse] = await Promise.all([
-          fetch(`${apiRoutes.routes.products.path}?limit=${NEW_LIMIT}`, {
-            // 미디어 교체 반영이 늦지 않도록 최신 응답만 사용합니다.
-            cache: "no-store",
-          }),
-          fetch(
-            `${apiRoutes.routes.products.path}?limit=${PIN_SOURCE_LIMIT}&sort=id&order=asc`,
-            {
-              // 고정 세트 조회도 캐시 대신 즉시 최신 데이터를 받습니다.
-              cache: "no-store",
-            },
-          ),
+          // 목록 API의 짧은 캐시를 활용해 반복 이동 시 체감 속도를 높입니다.
+          fetch(`${apiRoutes.routes.products.path}?limit=${NEW_LIMIT}`),
+          fetch(`${apiRoutes.routes.products.path}?limit=${PIN_SOURCE_LIMIT}&sort=id&order=asc`),
         ])
 
         const latestRaw = await safeParseJson<unknown>(latestResponse)

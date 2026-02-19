@@ -115,8 +115,7 @@ export default function ProductCard({
   return (
     <Link
       href={`/product/${id}`}
-      // 목록 카드가 많을 때 과도한 prefetch 요청을 막기 위해 비활성화합니다.
-      prefetch={false}
+      // 상품 상세 이동 지연을 줄이기 위해 기본 prefetch를 사용합니다.
       className="group block"
       onMouseEnter={() => {
         setIsHovered(true)

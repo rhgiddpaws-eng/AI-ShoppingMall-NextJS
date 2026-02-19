@@ -36,8 +36,7 @@ export function CategoryCard({
     return (
         <Link
             href={href}
-            // 자동 prefetch 대신, 사용자가 카드에 의도를 보일 때 API까지 함께 예열합니다.
-            prefetch={false}
+            // 카테고리 카드 수가 적으므로 prefetch를 켜서 클릭 직후 전환을 빠르게 만듭니다.
             onMouseEnter={() => warmCategoryRoute(router, href)}
             onTouchStart={() => warmCategoryRoute(router, href)}
             onFocus={() => warmCategoryRoute(router, href)}

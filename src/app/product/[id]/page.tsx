@@ -74,8 +74,8 @@ export default function ProductPage() {
         setLoading(true)
 
         const response = await fetch(`${apiRoutes.routes.products.path}/${params.id}`, {
-          // 상세 페이지는 교체된 미디어를 즉시 보여주기 위해 캐시를 사용하지 않습니다.
-          cache: "no-store",
+          // 상세 페이지는 짧은 캐시를 사용해 재진입 속도를 높입니다.
+          cache: "force-cache",
         })
         if (!response.ok) {
           throw new Error("상품 정보를 불러오지 못했습니다.")

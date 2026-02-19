@@ -106,7 +106,7 @@ export function NavBar() {
                     <Link
                       key={href}
                       href={href}
-                      prefetch={false}
+                      // 주요 카테고리는 기본 prefetch를 켜서 클릭 직후 화면 전환을 빠르게 만듭니다.
                       className={`block py-2 font-medium hover:text-primary ${className ?? ""}`}
                       onTouchStart={() => handleCategoryIntent(href)}
                       onFocus={() => handleCategoryIntent(href)}
@@ -156,7 +156,7 @@ export function NavBar() {
             <Link
               key={href}
               href={href}
-              prefetch={false}
+              // 주요 카테고리는 기본 prefetch를 켜서 클릭 직후 화면 전환을 빠르게 만듭니다.
               onMouseEnter={() => handleCategoryIntent(href)}
               onFocus={() => handleCategoryIntent(href)}
               className={`text-sm font-medium hover:text-primary ${className ?? ""}`}

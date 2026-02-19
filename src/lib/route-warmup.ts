@@ -22,8 +22,8 @@ async function safeBackgroundFetch(url: string) {
   try {
     await fetch(url, {
       method: "GET",
-      // 워밍업은 연결 예열만 담당하고, 오래된 응답 캐시는 남기지 않습니다.
-      cache: "no-store",
+      // 워밍업에서 받은 응답을 브라우저 캐시에 넣어 실제 다음 이동에서 재사용합니다.
+      cache: "force-cache",
       keepalive: true,
     })
   } catch {

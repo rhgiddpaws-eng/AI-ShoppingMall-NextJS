@@ -94,17 +94,8 @@ export function FeaturedProducts() {
       try {
         // 최신 목록과 고정 세트 후보를 동시에 가져와서 합성합니다.
         const [latestResponse, pinSourceResponse] = await Promise.all([
-          fetch(`${apiRoutes.routes.products.path}?limit=${FEATURED_LIMIT}`, {
-            // 대표 미디어 교체 직후에도 최신 목록을 즉시 받습니다.
-            cache: "no-store",
-          }),
-          fetch(
-            `${apiRoutes.routes.products.path}?limit=${PIN_SOURCE_LIMIT}&sort=id&order=asc`,
-            {
-              // 고정 세트 조회도 동일하게 최신 응답을 사용합니다.
-              cache: "no-store",
-            },
-          ),
+          fetch(`${apiRoutes.routes.products.path}?limit=${FEATURED_LIMIT}`),
+          fetch(`${apiRoutes.routes.products.path}?limit=${PIN_SOURCE_LIMIT}&sort=id&order=asc`),
         ])
 
         const latestRaw = await safeParseJson<unknown>(latestResponse)

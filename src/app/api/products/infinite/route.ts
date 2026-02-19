@@ -14,6 +14,8 @@ export const preferredRegion = "syd1"
 export const dynamic = "force-dynamic"
 // 라우트 재검증 캐시를 비활성화합니다.
 export const revalidate = 0
+// 무한 스크롤 응답도 30초 CDN 캐시로 짧게 재사용해서 반복 이동 지연을 줄입니다.
+const PRODUCT_INFINITE_CACHE_CONTROL = "public, s-maxage=30, stale-while-revalidate=300"
 
 const ALLOWED_SORT_KEYS = ["id", "name", "price", "createdAt", "updatedAt"] as const
 const ALLOWED_CATEGORY_VALUES = ["MEN", "WOMEN", "ACCESSORIES", "SHOES", "SALE", "NEW"] as const
@@ -94,8 +96,8 @@ export async function GET(request: NextRequest) {
       },
       {
         headers: {
-          // 로그인 여부와 상관없이 최신 목록을 받도록 no-store를 사용합니다.
-          "Cache-Control": "no-store",
+          // 목록 페이지 재방문 시 같은 페이지 조각을 빠르게 재사용합니다.
+          "Cache-Control": PRODUCT_INFINITE_CACHE_CONTROL,
         },
       },
     )

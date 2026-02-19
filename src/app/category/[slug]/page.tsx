@@ -97,8 +97,8 @@ export default function CategoryPage() {
       const firstResponse = await fetch(
         `${apiRoutes.routes.products.path}?${firstQuery.toString()}`,
         {
-          // 카테고리 첫 페이지는 최신 미디어 키를 바로 반영합니다.
-          cache: "no-store",
+          // 카테고리 첫 페이지는 짧은 캐시를 사용해 재진입 속도를 높입니다.
+          cache: "force-cache",
         },
       )
 
@@ -134,8 +134,8 @@ export default function CategoryPage() {
     const response = await fetch(
       `${apiRoutes.routes.products.routes.infinite.path}?${query.toString()}`,
       {
-        // 무한 스크롤 페이지도 동일하게 캐시 없이 최신값을 사용합니다.
-        cache: "no-store",
+        // 무한 스크롤 페이지도 짧은 캐시를 사용해 추가 로딩 지연을 줄입니다.
+        cache: "force-cache",
       },
     )
 

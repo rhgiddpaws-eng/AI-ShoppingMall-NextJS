@@ -12,6 +12,8 @@ export const preferredRegion = "syd1"
 export const dynamic = "force-dynamic"
 // 라우트 레벨 재검증 캐시도 비활성화합니다.
 export const revalidate = 0
+// 상세 응답은 30초만 CDN 캐시해서 연속 상세 이동 지연을 줄입니다.
+const PRODUCT_DETAIL_CACHE_CONTROL = "public, s-maxage=30, stale-while-revalidate=300"
 
 export async function GET(
   _request: NextRequest,
@@ -54,8 +56,8 @@ export async function GET(
 
     return NextResponse.json(product, {
       headers: {
-        // 삭제/교체된 미디어 키가 남지 않도록 항상 최신 값을 내려줍니다.
-        "Cache-Control": "no-store",
+        // 상세 재방문 시 DB 재조회 빈도를 줄여 이동 체감을 개선합니다.
+        "Cache-Control": PRODUCT_DETAIL_CACHE_CONTROL,
       },
     })
   } catch (error) {
