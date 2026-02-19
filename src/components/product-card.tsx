@@ -53,6 +53,8 @@ export default function ProductCard({
     mediaFallbackSrc.startsWith("http://") || mediaFallbackSrc.startsWith("https://")
   // 동영상이면 <video>, 아니면 <Image>를 렌더링합니다.
   const isVideoMedia = isVideoMediaPath(mediaFallbackSrc)
+  // 인물형 영상에서 얼굴이 잘리지 않도록 포커스를 살짝 위쪽으로 올립니다.
+  const videoObjectPositionClass = "object-[50%_32%]"
   // 세로형 룩북 영상이 잘리지 않도록 영상 카드 비율을 더 세로로 잡습니다.
   // 메인/카테고리/추천 카드 높이가 들쭉날쭉해지지 않도록 비율을 통일합니다.
   const mediaAspectClass = "aspect-[7/8]"
@@ -130,7 +132,7 @@ export default function ProductCard({
             <video
               src={mediaFallbackSrc}
               // 동영상 원본에 레터박스가 있어도 카드에서 꽉 차게 보이도록 cover를 사용합니다.
-              className="h-full w-full bg-black object-cover"
+              className={`h-full w-full bg-black object-cover ${videoObjectPositionClass}`}
               autoPlay
               muted
               loop

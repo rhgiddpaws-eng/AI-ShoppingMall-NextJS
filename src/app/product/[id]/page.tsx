@@ -213,10 +213,10 @@ export default function ProductPage() {
   const isVideoMedia = isVideoMediaType(firstMedia?.mediaType) || isVideoMediaPath(mediaUrl)
   const isRemoteImage =
     !isVideoMedia && (mediaUrl.startsWith("http://") || mediaUrl.startsWith("https://"))
-  // 세로형 룩북 영상은 폭을 줄이고 높이를 늘려 얼굴/전신이 잘리지 않게 보여줍니다.
-  const mediaWrapperClass = isVideoMedia
-    ? "relative mx-auto aspect-[9/16] w-full max-w-[420px] overflow-hidden rounded-lg bg-black"
-    : "relative aspect-square overflow-hidden rounded-lg bg-muted"
+  // 상세 미디어 프레임은 이미지/동영상 모두 기존 정사각 비율을 유지합니다.
+  const mediaWrapperClass = "relative aspect-square overflow-hidden rounded-lg bg-muted"
+  // 동영상만 포커스를 약간 위로 옮겨 얼굴(머리) 잘림을 줄입니다.
+  const videoObjectPositionClass = "object-[50%_32%]"
 
   const finalPrice = product.price * (1 - product.discountRate)
 
@@ -239,7 +239,7 @@ export default function ProductPage() {
               src={mediaUrl}
               poster={mediaPosterUrl}
               // 상세 영상에서도 레터박스가 과하게 보이지 않도록 화면을 꽉 채워 표시합니다.
-              className="h-full w-full object-cover"
+              className={`h-full w-full bg-black object-cover ${videoObjectPositionClass}`}
               autoPlay
               muted
               loop

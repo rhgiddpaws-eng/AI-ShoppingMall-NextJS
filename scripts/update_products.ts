@@ -54,6 +54,7 @@ type CliOptions = {
   limit?: number
   useFfmpeg?: boolean
   ffmpegRequired?: boolean
+  forceNewKeys?: boolean
 }
 
 type VideoPipelineOptions = {
@@ -66,6 +67,7 @@ type VideoPipelineOptions = {
  * 예시:
  * - pnpm run update-products -- --name-exact="남성 케쥬얼 의상 2번 상품"
  * - pnpm run update-products -- --set=2 --limit=1
+ * - pnpm run update-products -- --name-exact="남성 케쥬얼 의상 2번 상품" --force-new-keys
  */
 function parseCliOptions(): CliOptions {
   const args = process.argv.slice(2).filter(arg => arg !== '--')
@@ -86,6 +88,11 @@ function parseCliOptions(): CliOptions {
       // ffmpeg가 없으면 바로 실패하게 해서 품질을 강제합니다.
       options.useFfmpeg = true
       options.ffmpegRequired = true
+      continue
+    }
+    if (arg === '--force-new-keys') {
+      // CDN 캐시를 즉시 우회해야 할 때 새 S3 키를 강제로 발급합니다.
+      options.forceNewKeys = true
       continue
     }
     if (arg.startsWith('--name-exact=')) {
@@ -612,7 +619,8 @@ async function main() {
             }
 
             const existingImageSlot = currentDBImages[j]
-            const targetKeys = existingImageSlot
+            // 강제 새 키 옵션이면 기존 키 재사용을 끄고 새 경로로 업로드합니다.
+            const targetKeys = !options.forceNewKeys && existingImageSlot
               ? { original: existingImageSlot.original, thumbnail: existingImageSlot.thumbnail }
               : undefined
 
