@@ -11,6 +11,10 @@ import { pickCardMediaKey } from "@/lib/media"
 
 // DB와 가까운 리전을 우선 사용해서 추천 쿼리 응답 시간을 줄입니다.
 export const preferredRegion = "syd1"
+// 추천 카드의 대표 미디어가 즉시 반영되도록 정적 캐시를 끕니다.
+export const dynamic = "force-dynamic"
+// 라우트 재검증 캐시를 비활성화합니다.
+export const revalidate = 0
 
 type SimilarRow = {
   id: number
@@ -188,9 +192,8 @@ export async function GET(request: Request) {
 
       return NextResponse.json(orderedProducts.map(toRecommendedItem), {
         headers: {
-          "Cache-Control": "public, max-age=0, s-maxage=120, stale-while-revalidate=600",
-          "CDN-Cache-Control": "public, s-maxage=120, stale-while-revalidate=600",
-          "Vercel-CDN-Cache-Control": "public, s-maxage=180",
+          // 비로그인/로그인 상관없이 최신 추천 미디어 키를 받도록 no-store를 사용합니다.
+          "Cache-Control": "no-store",
         },
       })
     }
@@ -198,9 +201,8 @@ export async function GET(request: Request) {
     const fallbackProducts = await findFallbackProducts(excludeId, currentCategory, 4)
     return NextResponse.json(fallbackProducts.map(toRecommendedItem), {
       headers: {
-        "Cache-Control": "public, max-age=0, s-maxage=120, stale-while-revalidate=600",
-        "CDN-Cache-Control": "public, s-maxage=120, stale-while-revalidate=600",
-        "Vercel-CDN-Cache-Control": "public, s-maxage=180",
+        // fallback 경로도 동일하게 최신 응답을 우선합니다.
+        "Cache-Control": "no-store",
       },
     })
   } catch (error) {
@@ -211,18 +213,16 @@ export async function GET(request: Request) {
       const safeFallback = await findFallbackProducts(excludeId, currentCategory, 4)
       return NextResponse.json(safeFallback.map(toRecommendedItem), {
         headers: {
-          "Cache-Control": "public, max-age=0, s-maxage=60, stale-while-revalidate=300",
-          "CDN-Cache-Control": "public, s-maxage=60, stale-while-revalidate=300",
-          "Vercel-CDN-Cache-Control": "public, s-maxage=90",
+          // 오류 복구 시에도 오래된 캐시가 남지 않도록 no-store를 유지합니다.
+          "Cache-Control": "no-store",
         },
       })
     } catch (fallbackError) {
       console.error("추천 상품 fallback 조회 오류:", fallbackError)
       return NextResponse.json([], {
         headers: {
-          "Cache-Control": "public, max-age=0, s-maxage=30, stale-while-revalidate=120",
-          "CDN-Cache-Control": "public, s-maxage=30, stale-while-revalidate=120",
-          "Vercel-CDN-Cache-Control": "public, s-maxage=60",
+          // 최종 fallback도 최신성 우선 정책을 동일하게 적용합니다.
+          "Cache-Control": "no-store",
         },
       })
     }

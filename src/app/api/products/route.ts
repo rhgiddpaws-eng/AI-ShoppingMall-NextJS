@@ -10,6 +10,10 @@ import prismaClient from "@/lib/prismaClient"
 
 // DB와 가까운 리전을 우선 사용해서 첫 응답 시간을 줄입니다.
 export const preferredRegion = "syd1"
+// 상품 미디어 키가 바뀌면 즉시 반영되어야 하므로 정적 캐시를 비활성화합니다.
+export const dynamic = "force-dynamic"
+// Next.js의 라우트 재검증 캐시도 함께 끕니다.
+export const revalidate = 0
 
 export type ProductImage = {
   id: number
@@ -101,10 +105,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(products, {
       headers: {
-        // Vercel CDN 캐시를 적극 활용해 첫 진입 체감을 줄입니다.
-        "Cache-Control": "public, max-age=0, s-maxage=120, stale-while-revalidate=600",
-        "CDN-Cache-Control": "public, s-maxage=120, stale-while-revalidate=600",
-        "Vercel-CDN-Cache-Control": "public, s-maxage=180",
+        // 비로그인/로그인 상태와 무관하게 항상 최신 미디어 키를 받도록 no-store를 사용합니다.
+        "Cache-Control": "no-store",
       },
     })
   } catch (error) {

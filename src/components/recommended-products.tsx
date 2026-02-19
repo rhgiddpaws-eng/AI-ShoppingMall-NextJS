@@ -53,7 +53,10 @@ export function RecommendedProducts({ currentProductId }: RecommendedProductsPro
       setError(null)
       
       try {
-        const response = await fetch(`/api/products/recommended?exclude=${currentProductId}`)
+        const response = await fetch(`/api/products/recommended?exclude=${currentProductId}`, {
+          // 추천 카드도 미디어 교체를 바로 반영하기 위해 캐시를 비활성화합니다.
+          cache: "no-store",
+        })
         
         if (!response.ok) {
           const errorData = await safeParseJson<{ error?: string }>(response)

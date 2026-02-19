@@ -73,7 +73,10 @@ export default function ProductPage() {
       try {
         setLoading(true)
 
-        const response = await fetch(`${apiRoutes.routes.products.path}/${params.id}`)
+        const response = await fetch(`${apiRoutes.routes.products.path}/${params.id}`, {
+          // 상세 페이지는 교체된 미디어를 즉시 보여주기 위해 캐시를 사용하지 않습니다.
+          cache: "no-store",
+        })
         if (!response.ok) {
           throw new Error("상품 정보를 불러오지 못했습니다.")
         }
@@ -210,6 +213,10 @@ export default function ProductPage() {
   const isVideoMedia = isVideoMediaType(firstMedia?.mediaType) || isVideoMediaPath(mediaUrl)
   const isRemoteImage =
     !isVideoMedia && (mediaUrl.startsWith("http://") || mediaUrl.startsWith("https://"))
+  // 세로형 룩북 영상은 폭을 줄이고 높이를 늘려 얼굴/전신이 잘리지 않게 보여줍니다.
+  const mediaWrapperClass = isVideoMedia
+    ? "relative mx-auto aspect-[9/16] w-full max-w-[420px] overflow-hidden rounded-lg bg-black"
+    : "relative aspect-square overflow-hidden rounded-lg bg-muted"
 
   const finalPrice = product.price * (1 - product.discountRate)
 
@@ -226,16 +233,17 @@ export default function ProductPage() {
       </Button>
 
       <div className="grid gap-8 md:grid-cols-2">
-        <div className="relative aspect-square overflow-hidden rounded-lg bg-muted">
+        <div className={mediaWrapperClass}>
           {isVideoMedia ? (
             <video
               src={mediaUrl}
               poster={mediaPosterUrl}
-              className="h-full w-full scale-[1.02] object-cover"
+              className="h-full w-full object-contain"
               autoPlay
               muted
               loop
               playsInline
+              // 상세 동영상도 전체 파일을 한 번에 받지 않도록 메타데이터 우선으로 불러옵니다.
               preload="metadata"
               aria-label={`${product.name} 상품 동영상`}
             />

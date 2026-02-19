@@ -22,7 +22,8 @@ async function safeBackgroundFetch(url: string) {
   try {
     await fetch(url, {
       method: "GET",
-      cache: "force-cache",
+      // 워밍업은 연결 예열만 담당하고, 오래된 응답 캐시는 남기지 않습니다.
+      cache: "no-store",
       keepalive: true,
     })
   } catch {

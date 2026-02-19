@@ -10,6 +10,10 @@ import prismaClient from "@/lib/prismaClient"
 
 // DB와 가까운 리전을 우선 사용해서 네트워크 왕복 시간을 줄입니다.
 export const preferredRegion = "syd1"
+// 무한 스크롤 카드의 미디어 교체가 즉시 보이도록 정적 캐시를 끕니다.
+export const dynamic = "force-dynamic"
+// 라우트 재검증 캐시를 비활성화합니다.
+export const revalidate = 0
 
 const ALLOWED_SORT_KEYS = ["id", "name", "price", "createdAt", "updatedAt"] as const
 const ALLOWED_CATEGORY_VALUES = ["MEN", "WOMEN", "ACCESSORIES", "SHOES", "SALE", "NEW"] as const
@@ -90,9 +94,8 @@ export async function GET(request: NextRequest) {
       },
       {
         headers: {
-          "Cache-Control": "public, max-age=0, s-maxage=60, stale-while-revalidate=300",
-          "CDN-Cache-Control": "public, s-maxage=60, stale-while-revalidate=300",
-          "Vercel-CDN-Cache-Control": "public, s-maxage=90",
+          // 로그인 여부와 상관없이 최신 목록을 받도록 no-store를 사용합니다.
+          "Cache-Control": "no-store",
         },
       },
     )

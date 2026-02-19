@@ -96,6 +96,10 @@ export default function CategoryPage() {
 
       const firstResponse = await fetch(
         `${apiRoutes.routes.products.path}?${firstQuery.toString()}`,
+        {
+          // 카테고리 첫 페이지는 최신 미디어 키를 바로 반영합니다.
+          cache: "no-store",
+        },
       )
 
       if (!firstResponse.ok) {
@@ -129,6 +133,10 @@ export default function CategoryPage() {
 
     const response = await fetch(
       `${apiRoutes.routes.products.routes.infinite.path}?${query.toString()}`,
+      {
+        // 무한 스크롤 페이지도 동일하게 캐시 없이 최신값을 사용합니다.
+        cache: "no-store",
+      },
     )
 
     if (!response.ok) {

@@ -53,6 +53,8 @@ export default function ProductCard({
     mediaFallbackSrc.startsWith("http://") || mediaFallbackSrc.startsWith("https://")
   // 동영상이면 <video>, 아니면 <Image>를 렌더링합니다.
   const isVideoMedia = isVideoMediaPath(mediaFallbackSrc)
+  // 세로형 룩북 영상이 잘리지 않도록 영상 카드 비율을 더 세로로 잡습니다.
+  const mediaAspectClass = isVideoMedia ? "aspect-[3/4]" : "aspect-[7/8]"
 
   // 카드에 마우스를 올렸을 때 상세 진입 전에 API를 예열합니다.
   const prefetchProductDetail = () => {
@@ -122,16 +124,17 @@ export default function ProductCard({
       onFocus={prefetchProductDetail}
     >
       <div className="relative overflow-hidden rounded-lg">
-        <div className="relative aspect-[7/8] w-full rounded-lg border border-gray-200 bg-muted">
+        <div className={`relative ${mediaAspectClass} w-full rounded-lg border border-gray-200 bg-muted`}>
           {isVideoMedia ? (
             <video
               src={mediaFallbackSrc}
-              className="h-full w-full scale-105 object-cover transition-transform duration-300 group-hover:scale-110"
+              className="h-full w-full bg-black object-contain"
               autoPlay
               muted
               loop
               playsInline
-              preload="metadata"
+              // 카드 다수 렌더 시 초기 버벅임을 줄이기 위해 메타데이터만 먼저 불러옵니다.
+              preload="none"
               aria-label={`${name} 상품 동영상`}
             />
           ) : (

@@ -8,6 +8,10 @@ import prismaClient from "@/lib/prismaClient"
 
 // DB와 가까운 리전을 우선 사용해서 상세 조회 첫 응답 시간을 줄입니다.
 export const preferredRegion = "syd1"
+// 상세 미디어는 변경 직후 즉시 반영되어야 하므로 정적 캐시를 끕니다.
+export const dynamic = "force-dynamic"
+// 라우트 레벨 재검증 캐시도 비활성화합니다.
+export const revalidate = 0
 
 export async function GET(
   _request: NextRequest,
@@ -50,10 +54,8 @@ export async function GET(
 
     return NextResponse.json(product, {
       headers: {
-        // 상세 데이터도 CDN 캐시를 사용해 첫 진입 체감을 개선합니다.
-        "Cache-Control": "public, max-age=0, s-maxage=120, stale-while-revalidate=600",
-        "CDN-Cache-Control": "public, s-maxage=120, stale-while-revalidate=600",
-        "Vercel-CDN-Cache-Control": "public, s-maxage=180",
+        // 삭제/교체된 미디어 키가 남지 않도록 항상 최신 값을 내려줍니다.
+        "Cache-Control": "no-store",
       },
     })
   } catch (error) {

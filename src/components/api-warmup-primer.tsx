@@ -16,7 +16,8 @@ async function safeWarmupFetch(url: string) {
   try {
     return await fetch(url, {
       method: "GET",
-      cache: "force-cache",
+      // 워밍업 단계에서 오래된 응답을 브라우저에 고정하지 않도록 no-store를 사용합니다.
+      cache: "no-store",
       keepalive: true,
     })
   } catch {

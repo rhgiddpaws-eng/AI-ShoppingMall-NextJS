@@ -202,20 +202,37 @@ export function NaverDeliveryMap({
     let cancelled = false
 
     const loadClientId = async () => {
-      try {
-        const response = await fetch("/api/naver/client-id", { cache: "no-store" })
-        if (!response.ok) return
+      // 간헐적인 네트워크 실패가 있어도 지도가 바로 복구되도록 짧게 재시도합니다.
+      const MAX_ATTEMPTS = 3
 
-        const data = (await response.json()) as { clientId?: string }
-        if (!cancelled && typeof data.clientId === "string") {
-          setClientId(data.clientId.trim())
+      for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
+        try {
+          const response = await fetch("/api/naver/client-id", { cache: "no-store" })
+          if (!response.ok) {
+            throw new Error(`client-id fetch failed: ${response.status}`)
+          }
+
+          const data = (await response.json()) as { clientId?: string }
+          const resolvedClientId = typeof data.clientId === "string" ? data.clientId.trim() : ""
+
+          if (!cancelled && resolvedClientId.length > 0) {
+            setClientId(resolvedClientId)
+            setIsClientIdLoaded(true)
+            return
+          }
+        } catch (error) {
+          console.error("map client id load error:", error)
         }
-      } catch (error) {
-        console.error("map client id load error:", error)
-      } finally {
-        if (!cancelled) {
-          setIsClientIdLoaded(true)
-        }
+
+        if (cancelled || attempt === MAX_ATTEMPTS) break
+
+        // 재시도 간격을 아주 짧게 둬 초기 렌더 지연을 최소화합니다.
+        await new Promise(resolve => setTimeout(resolve, 250 * attempt))
+      }
+
+      if (!cancelled) {
+        // 모든 시도가 끝났다면 성공/실패와 상관없이 로딩 상태를 종료합니다.
+        setIsClientIdLoaded(true)
       }
     }
 
