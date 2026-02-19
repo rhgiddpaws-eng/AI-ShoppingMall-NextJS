@@ -98,7 +98,8 @@ export default function CategoryPage() {
         `${apiRoutes.routes.products.path}?${firstQuery.toString()}`,
         {
           // 카테고리 첫 페이지는 짧은 캐시를 사용해 재진입 속도를 높입니다.
-          cache: "force-cache",
+          // 카테고리 첫 로딩은 최신 목록을 즉시 반영하기 위해 no-store를 사용합니다.
+          cache: "no-store",
         },
       )
 
@@ -135,7 +136,8 @@ export default function CategoryPage() {
       `${apiRoutes.routes.products.routes.infinite.path}?${query.toString()}`,
       {
         // 무한 스크롤 페이지도 짧은 캐시를 사용해 추가 로딩 지연을 줄입니다.
-        cache: "force-cache",
+        // 무한 스크롤 추가 페이지도 캐시 재사용 없이 최신 데이터를 조회합니다.
+        cache: "no-store",
       },
     )
 
@@ -163,7 +165,8 @@ export default function CategoryPage() {
     getNextPageParam: lastPage => (lastPage?.hasMore ? lastPage.page + 1 : undefined),
     initialPageParam: 1,
     // 카테고리 사진은 매번 재요청하지 않도록 기본 캐시 시간을 지정합니다.
-    staleTime: 30_000,
+    // 카테고리 목록은 라우트 이동 시 즉시 재검증합니다.
+    staleTime: 0,
     gcTime: 5 * 60_000,
     refetchOnWindowFocus: false,
     retry: 1,

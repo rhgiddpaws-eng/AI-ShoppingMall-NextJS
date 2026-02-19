@@ -12,8 +12,14 @@ export const preferredRegion = "syd1"
 export const dynamic = "force-dynamic"
 // 라우트 레벨 재검증 캐시도 비활성화합니다.
 export const revalidate = 0
-// 상세 응답은 30초만 CDN 캐시해서 연속 상세 이동 지연을 줄입니다.
-const PRODUCT_DETAIL_CACHE_CONTROL = "public, s-maxage=30, stale-while-revalidate=300"
+// 상세 응답은 항상 최신 미디어를 보장해야 하므로 CDN/브라우저 캐시를 모두 끕니다.
+const PRODUCT_DETAIL_RESPONSE_HEADERS = {
+  "Cache-Control": "no-store, no-cache, must-revalidate",
+  "CDN-Cache-Control": "no-store",
+  "Vercel-CDN-Cache-Control": "no-store",
+  Pragma: "no-cache",
+  Expires: "0",
+} as const
 
 export async function GET(
   _request: NextRequest,
@@ -57,8 +63,8 @@ export async function GET(
 
     return NextResponse.json(product, {
       headers: {
-        // 상세 재방문 시 DB 재조회 빈도를 줄여 이동 체감을 개선합니다.
-        "Cache-Control": PRODUCT_DETAIL_CACHE_CONTROL,
+        // 상세 캐시를 강하게 무효화해서 도메인별 오래된 응답 재사용을 막습니다.
+        ...PRODUCT_DETAIL_RESPONSE_HEADERS,
       },
     })
   } catch (error) {

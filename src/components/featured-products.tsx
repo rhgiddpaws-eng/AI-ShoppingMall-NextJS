@@ -94,8 +94,14 @@ export function FeaturedProducts() {
       try {
         // 최신 목록과 고정 세트 후보를 동시에 가져와서 합성합니다.
         const [latestResponse, pinSourceResponse] = await Promise.all([
-          fetch(`${apiRoutes.routes.products.path}?limit=${FEATURED_LIMIT}`),
-          fetch(`${apiRoutes.routes.products.path}?limit=${PIN_SOURCE_LIMIT}&sort=id&order=asc`),
+          fetch(`${apiRoutes.routes.products.path}?limit=${FEATURED_LIMIT}`, {
+            // 메인 추천도 항상 최신 카드 구성을 받도록 캐시를 비활성화합니다.
+            cache: "no-store",
+          }),
+          fetch(`${apiRoutes.routes.products.path}?limit=${PIN_SOURCE_LIMIT}&sort=id&order=asc`, {
+            // 고정 세트 소스도 동일하게 no-store로 조회해 도메인 캐시 불일치를 막습니다.
+            cache: "no-store",
+          }),
         ])
 
         const latestRaw = await safeParseJson<unknown>(latestResponse)

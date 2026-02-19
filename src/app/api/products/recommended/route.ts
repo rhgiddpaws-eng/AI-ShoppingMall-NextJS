@@ -15,8 +15,14 @@ export const preferredRegion = "syd1"
 export const dynamic = "force-dynamic"
 // 라우트 재검증 캐시를 비활성화합니다.
 export const revalidate = 0
-// 추천 목록은 짧은 시간만 캐시해 상세 이동 반복 시 체감 속도를 높입니다.
-const PRODUCT_RECOMMENDED_CACHE_CONTROL = "public, s-maxage=30, stale-while-revalidate=300"
+// 추천 목록도 도메인 캐시 차이 없이 즉시 갱신되도록 강한 no-store 헤더를 사용합니다.
+const PRODUCT_RECOMMENDED_RESPONSE_HEADERS = {
+  "Cache-Control": "no-store, no-cache, must-revalidate",
+  "CDN-Cache-Control": "no-store",
+  "Vercel-CDN-Cache-Control": "no-store",
+  Pragma: "no-cache",
+  Expires: "0",
+} as const
 
 type SimilarRow = {
   id: number
@@ -219,8 +225,8 @@ export async function GET(request: Request) {
 
         return NextResponse.json(mergedProducts.slice(0, 4).map(toRecommendedItem), {
           headers: {
-            // 추천 카드 재조회는 짧게 캐시해서 상세 페이지 왕복 지연을 줄입니다.
-            "Cache-Control": PRODUCT_RECOMMENDED_CACHE_CONTROL,
+            // 추천 API 캐시를 강하게 끄고 매번 최신 추천 목록을 반환합니다.
+            ...PRODUCT_RECOMMENDED_RESPONSE_HEADERS,
           },
         })
       }
@@ -229,8 +235,8 @@ export async function GET(request: Request) {
     const fallbackProducts = await findFallbackProducts(excludeId, currentCategory, 4)
     return NextResponse.json(fallbackProducts.map(toRecommendedItem), {
       headers: {
-        // fallback 결과도 동일한 짧은 캐시 정책을 유지합니다.
-        "Cache-Control": PRODUCT_RECOMMENDED_CACHE_CONTROL,
+        // fallback 응답도 동일하게 no-store로 강제합니다.
+        ...PRODUCT_RECOMMENDED_RESPONSE_HEADERS,
       },
     })
   } catch (error) {
@@ -241,16 +247,16 @@ export async function GET(request: Request) {
       const safeFallback = await findFallbackProducts(excludeId, currentCategory, 4)
       return NextResponse.json(safeFallback.map(toRecommendedItem), {
         headers: {
-          // 오류 복구 응답도 같은 캐시 정책으로 재요청 부담을 줄입니다.
-          "Cache-Control": PRODUCT_RECOMMENDED_CACHE_CONTROL,
+          // 오류 복구 응답도 캐시를 남기지 않아 즉시 회복 결과를 반영합니다.
+          ...PRODUCT_RECOMMENDED_RESPONSE_HEADERS,
         },
       })
     } catch (fallbackError) {
       console.error("추천 상품 fallback 조회 오류:", fallbackError)
       return NextResponse.json([], {
         headers: {
-          // 빈 결과도 짧은 캐시를 둬 연속 실패 시 지연을 완화합니다.
-          "Cache-Control": PRODUCT_RECOMMENDED_CACHE_CONTROL,
+          // 빈 결과도 no-store로 고정해 오류 회복 시 즉시 다시 조회되게 합니다.
+          ...PRODUCT_RECOMMENDED_RESPONSE_HEADERS,
         },
       })
     }

@@ -14,8 +14,14 @@ export const preferredRegion = "syd1"
 export const dynamic = "force-dynamic"
 // Next.js의 라우트 재검증 캐시도 함께 끕니다.
 export const revalidate = 0
-// 목록 응답은 30초만 CDN 캐시하고 이후 백그라운드 재검증해서 체감 속도를 높입니다.
-const PRODUCT_LIST_CACHE_CONTROL = "public, s-maxage=30, stale-while-revalidate=300"
+// 도메인별 엣지 캐시 차이로 오래된 목록이 보이지 않도록 강한 no-store 헤더를 사용합니다.
+const PRODUCT_LIST_RESPONSE_HEADERS = {
+  "Cache-Control": "no-store, no-cache, must-revalidate",
+  "CDN-Cache-Control": "no-store",
+  "Vercel-CDN-Cache-Control": "no-store",
+  Pragma: "no-cache",
+  Expires: "0",
+} as const
 
 export type ProductImage = {
   id: number
@@ -108,8 +114,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(products, {
       headers: {
-        // 목록은 짧은 캐시를 허용해 페이지 재이동 시 DB 왕복을 줄입니다.
-        "Cache-Control": PRODUCT_LIST_CACHE_CONTROL,
+        // 브라우저와 CDN 모두 캐시를 남기지 않도록 강하게 비활성화합니다.
+        ...PRODUCT_LIST_RESPONSE_HEADERS,
       },
     })
   } catch (error) {

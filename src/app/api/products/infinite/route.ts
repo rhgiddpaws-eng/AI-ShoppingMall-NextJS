@@ -14,8 +14,14 @@ export const preferredRegion = "syd1"
 export const dynamic = "force-dynamic"
 // 라우트 재검증 캐시를 비활성화합니다.
 export const revalidate = 0
-// 무한 스크롤 응답도 30초 CDN 캐시로 짧게 재사용해서 반복 이동 지연을 줄입니다.
-const PRODUCT_INFINITE_CACHE_CONTROL = "public, s-maxage=30, stale-while-revalidate=300"
+// 도메인별 엣지 캐시 차이로 페이지 조각이 오래 남지 않도록 no-store를 고정합니다.
+const PRODUCT_INFINITE_RESPONSE_HEADERS = {
+  "Cache-Control": "no-store, no-cache, must-revalidate",
+  "CDN-Cache-Control": "no-store",
+  "Vercel-CDN-Cache-Control": "no-store",
+  Pragma: "no-cache",
+  Expires: "0",
+} as const
 
 const ALLOWED_SORT_KEYS = ["id", "name", "price", "createdAt", "updatedAt"] as const
 const ALLOWED_CATEGORY_VALUES = ["MEN", "WOMEN", "ACCESSORIES", "SHOES", "SALE", "NEW"] as const
@@ -97,8 +103,8 @@ export async function GET(request: NextRequest) {
       },
       {
         headers: {
-          // 목록 페이지 재방문 시 같은 페이지 조각을 빠르게 재사용합니다.
-          "Cache-Control": PRODUCT_INFINITE_CACHE_CONTROL,
+          // 무한 스크롤 조각도 캐시를 남기지 않아 항상 최신 응답을 사용합니다.
+          ...PRODUCT_INFINITE_RESPONSE_HEADERS,
         },
       },
     )

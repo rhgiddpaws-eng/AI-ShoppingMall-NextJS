@@ -55,7 +55,8 @@ export function RecommendedProducts({ currentProductId }: RecommendedProductsPro
       try {
         const response = await fetch(`/api/products/recommended?exclude=${currentProductId}`, {
           // 추천 카드는 짧은 캐시를 활용해 상세 페이지 재진입 지연을 줄입니다.
-          cache: "force-cache",
+          // 추천 상품은 상세 이동마다 최신 결과를 받아야 해서 no-store를 사용합니다.
+          cache: "no-store",
         })
         
         if (!response.ok) {

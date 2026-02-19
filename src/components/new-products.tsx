@@ -38,8 +38,14 @@ export function NewProducts() {
         // 최신 목록 + 고정 세트 후보를 함께 조회해 메인 노출 순서를 재구성합니다.
         const [latestResponse, pinSourceResponse] = await Promise.all([
           // 목록 API의 짧은 캐시를 활용해 반복 이동 시 체감 속도를 높입니다.
-          fetch(`${apiRoutes.routes.products.path}?limit=${NEW_LIMIT}`),
-          fetch(`${apiRoutes.routes.products.path}?limit=${PIN_SOURCE_LIMIT}&sort=id&order=asc`),
+          fetch(`${apiRoutes.routes.products.path}?limit=${NEW_LIMIT}`, {
+            // 신상품 목록은 항상 최신 상태를 반영하도록 no-store를 적용합니다.
+            cache: "no-store",
+          }),
+          fetch(`${apiRoutes.routes.products.path}?limit=${PIN_SOURCE_LIMIT}&sort=id&order=asc`, {
+            // 고정 세트 소스도 캐시 없이 받아 홈 화면 불일치를 방지합니다.
+            cache: "no-store",
+          }),
         ])
 
         const latestRaw = await safeParseJson<unknown>(latestResponse)

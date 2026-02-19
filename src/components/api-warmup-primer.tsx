@@ -17,7 +17,8 @@ async function safeWarmupFetch(url: string) {
     return await fetch(url, {
       method: "GET",
       // 워밍업 응답을 브라우저 캐시에 저장해 다음 페이지 이동 때 바로 재사용합니다.
-      cache: "force-cache",
+      // 프라이머 요청은 캐시 적재가 아닌 서버 예열이 목적이라 no-store로 고정합니다.
+      cache: "no-store",
       keepalive: true,
     })
   } catch {
