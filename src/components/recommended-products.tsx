@@ -20,12 +20,12 @@
  * - key=product.id, id는 product.id.toString()
  *
  * [라이브러리 연계]
- * - react: useState, useEffect
+ * - @tanstack/react-query: useQuery
  * - @/components/product-card: ProductCard
  * - fetch: /api/products/recommended (내부 API)
  */
 
-import { useState, useEffect } from "react"
+import { useQuery } from "@tanstack/react-query"
 import ProductCard from "@/components/product-card"
 import { safeParseJson } from "@/lib/utils"
 import { LoadingSpinner } from "@/components/ui/loading-spinner"
@@ -42,42 +42,42 @@ interface RecommendedProductsProps {
   currentProductId: string
 }
 
+// 추천 목록은 1분 동안 fresh로 취급해 같은 상세 재진입에서 즉시 보여줍니다.
+const RECOMMENDED_STALE_TIME_MS = 60_000
+// 추천 캐시는 20분 유지해 상세 간 이동 반복 시 재요청을 줄입니다.
+const RECOMMENDED_GC_TIME_MS = 20 * 60_000
+
+async function fetchRecommendedProducts(currentProductId: string): Promise<Product[]> {
+  const response = await fetch(`/api/products/recommended?exclude=${encodeURIComponent(currentProductId)}`)
+
+  if (!response.ok) {
+    const errorData = await safeParseJson<{ error?: string }>(response)
+    throw new Error(errorData?.error || "추천 상품을 불러오는데 실패했습니다")
+  }
+
+  const data = await safeParseJson<Product[]>(response)
+  return Array.isArray(data) ? data : []
+}
+
 export function RecommendedProducts({ currentProductId }: RecommendedProductsProps) {
-  const [recommendedProducts, setRecommendedProducts] = useState<Product[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const {
+    data: recommendedProducts = [],
+    isPending,
+    isError,
+    error,
+  } = useQuery({
+    queryKey: ["products", "recommended", currentProductId],
+    queryFn: () => fetchRecommendedProducts(currentProductId),
+    // 상세를 다시 열 때 스피너 대신 캐시를 바로 보여주기 위한 설정입니다.
+    staleTime: RECOMMENDED_STALE_TIME_MS,
+    gcTime: RECOMMENDED_GC_TIME_MS,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    retry: 1,
+    enabled: currentProductId.length > 0,
+  })
 
-  useEffect(() => {
-    const fetchRecommendedProducts = async () => {
-      setIsLoading(true)
-      setError(null)
-      
-      try {
-        const response = await fetch(`/api/products/recommended?exclude=${currentProductId}`, {
-          // 추천 카드는 짧은 캐시를 활용해 상세 페이지 재진입 지연을 줄입니다.
-          // 추천 상품은 상세 이동마다 최신 결과를 받아야 해서 no-store를 사용합니다.
-          cache: "no-store",
-        })
-        
-        if (!response.ok) {
-          const errorData = await safeParseJson<{ error?: string }>(response)
-          throw new Error(errorData?.error || "추천 상품을 불러오는데 실패했습니다")
-        }
-        
-        const data = await safeParseJson<Product[]>(response)
-        if (data) setRecommendedProducts(data)
-      } catch (error) {
-        console.error("추천 상품 로딩 오류:", error)
-        setError(error instanceof Error ? error.message : "추천 상품을 불러오는데 실패했습니다")
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    fetchRecommendedProducts()
-  }, [currentProductId])
-
-  if (isLoading) {
+  if (isPending) {
     return (
       <div className="py-8">
         {/* 추천 섹션 로딩은 공통 스피너로 통일합니다. */}
@@ -86,8 +86,10 @@ export function RecommendedProducts({ currentProductId }: RecommendedProductsPro
     )
   }
 
-  if (error) {
-    return <div className="text-center text-red-500 py-4">{error}</div>
+  if (isError) {
+    const message =
+      error instanceof Error ? error.message : "추천 상품을 불러오는데 실패했습니다"
+    return <div className="py-4 text-center text-red-500">{message}</div>
   }
 
   if (recommendedProducts.length === 0) {

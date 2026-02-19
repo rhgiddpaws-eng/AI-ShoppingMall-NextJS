@@ -6,6 +6,7 @@
 // =============================================================================
 
 import { useEffect, useState } from "react"
+import { useQuery } from "@tanstack/react-query"
 import Image from "next/image"
 import { useParams, useRouter } from "next/navigation"
 import { ArrowLeft, Heart, ShoppingCart } from "lucide-react"
@@ -60,6 +61,11 @@ function getPreviewImageUrl(product: ProductType): string {
   return "/placeholder.svg"
 }
 
+// 상세 재진입 속도를 높이기 위해 같은 상품 데이터는 1분 동안 fresh로 재사용합니다.
+const PRODUCT_STALE_TIME_MS = 60_000
+// 상세 캐시는 20분 유지해 뒤로 가기/재진입 시 재요청을 줄입니다.
+const PRODUCT_GC_TIME_MS = 20 * 60_000
+
 /**
  * 상품 상세 페이지입니다.
  * ID로 API를 조회하고 장바구니/위시리스트 버튼을 제공합니다.
@@ -69,44 +75,33 @@ export default function ProductPage() {
   const router = useRouter()
   const { addToCart, addToWishlist, removeFromWishlist, isInWishlist } =
     useShopStore()
+  const productId = String(params.id ?? "")
 
   const [isWishlisted, setIsWishlisted] = useState(false)
-  const [product, setProduct] = useState<ProductType | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    const fetchProduct = async () => {
-      try {
-        setLoading(true)
-
-        const response = await fetch(`${apiRoutes.routes.products.path}/${params.id}`, {
-          // 상세 페이지는 짧은 캐시를 사용해 재진입 속도를 높입니다.
-          // 상세 페이지는 항상 최신 대표 미디어를 받도록 캐시를 끕니다.
-          cache: "no-store",
-        })
-        if (!response.ok) {
-          throw new Error("상품 정보를 불러오지 못했습니다.")
-        }
-
-        const data = (await response.json()) as ProductType
-        setProduct(data)
-      } catch (fetchError) {
-        console.error("product fetch error:", fetchError)
-        setError(
-          fetchError instanceof Error
-            ? fetchError.message
-            : "상품 정보를 불러오는 중 오류가 발생했습니다.",
-        )
-      } finally {
-        setLoading(false)
+  const {
+    data: product,
+    isPending,
+    isError,
+    error,
+  } = useQuery({
+    queryKey: ["products", "detail", productId],
+    queryFn: async () => {
+      const response = await fetch(
+        `${apiRoutes.routes.products.path}/${encodeURIComponent(productId)}`,
+      )
+      if (!response.ok) {
+        throw new Error("상품 정보를 불러오지 못했습니다.")
       }
-    }
-
-    if (params.id) {
-      void fetchProduct()
-    }
-  }, [params.id])
+      return (await response.json()) as ProductType
+    },
+    enabled: productId.length > 0,
+    // 상세를 다시 열 때 스켈레톤 대신 캐시를 즉시 보여주기 위한 설정입니다.
+    staleTime: PRODUCT_STALE_TIME_MS,
+    gcTime: PRODUCT_GC_TIME_MS,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    retry: 1,
+  })
 
   useEffect(() => {
     if (!product) return
@@ -154,7 +149,7 @@ export default function ProductPage() {
     }
   }
 
-  if (loading) {
+  if (isPending) {
     return (
       <div className="container mx-auto px-4 py-8">
         {/* 상세페이지 로딩 중에는 최종 레이아웃과 비슷한 스켈레톤을 먼저 보여줍니다. */}
@@ -189,7 +184,11 @@ export default function ProductPage() {
     )
   }
 
-  if (error || !product) {
+  if (isError || !product) {
+    const errorMessage =
+      error instanceof Error
+        ? error.message
+        : "상품 정보를 불러오는 중 오류가 발생했습니다."
     return (
       <div className="container mx-auto px-4 py-8">
         <Button
@@ -205,7 +204,7 @@ export default function ProductPage() {
         <div className="py-10 text-center">
           <h2 className="text-xl font-semibold">상품을 찾을 수 없습니다.</h2>
           <p className="mt-2 text-gray-500">
-            {error || "잘못된 접근이거나 상품이 존재하지 않습니다."}
+            {errorMessage || "잘못된 접근이거나 상품이 존재하지 않습니다."}
           </p>
         </div>
       </div>

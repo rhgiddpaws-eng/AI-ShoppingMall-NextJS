@@ -10,17 +10,11 @@ import prismaClient from "@/lib/prismaClient"
 
 // DB와 가까운 리전을 우선 사용해서 네트워크 왕복 시간을 줄입니다.
 export const preferredRegion = "syd1"
-// 무한 스크롤 카드의 미디어 교체가 즉시 보이도록 정적 캐시를 끕니다.
-export const dynamic = "force-dynamic"
-// 라우트 재검증 캐시를 비활성화합니다.
-export const revalidate = 0
-// 도메인별 엣지 캐시 차이로 페이지 조각이 오래 남지 않도록 no-store를 고정합니다.
+// 무한 스크롤 페이지 조각은 짧게 캐시하고 만료 후 재검증해서 재진입 지연을 줄입니다.
 const PRODUCT_INFINITE_RESPONSE_HEADERS = {
-  "Cache-Control": "no-store, no-cache, must-revalidate",
-  "CDN-Cache-Control": "no-store",
-  "Vercel-CDN-Cache-Control": "no-store",
-  Pragma: "no-cache",
-  Expires: "0",
+  "Cache-Control": "public, max-age=30, s-maxage=120, stale-while-revalidate=600",
+  "CDN-Cache-Control": "public, s-maxage=120, stale-while-revalidate=600",
+  "Vercel-CDN-Cache-Control": "public, s-maxage=120, stale-while-revalidate=600",
 } as const
 
 const ALLOWED_SORT_KEYS = ["id", "name", "price", "createdAt", "updatedAt"] as const
@@ -103,7 +97,7 @@ export async function GET(request: NextRequest) {
       },
       {
         headers: {
-          // 무한 스크롤 조각도 캐시를 남기지 않아 항상 최신 응답을 사용합니다.
+          // 무한 스크롤 조각도 짧은 캐시를 재사용해 다음 진입/스크롤을 빠르게 만듭니다.
           ...PRODUCT_INFINITE_RESPONSE_HEADERS,
         },
       },

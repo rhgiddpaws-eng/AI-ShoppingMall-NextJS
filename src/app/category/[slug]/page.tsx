@@ -94,13 +94,9 @@ export default function CategoryPage() {
         limit: "13", // hasMore 판단을 위해 1개 더 조회합니다.
       })
 
+      // 카테고리 첫 페이지는 브라우저/React Query 캐시를 우선 활용해 재진입 속도를 높입니다.
       const firstResponse = await fetch(
         `${apiRoutes.routes.products.path}?${firstQuery.toString()}`,
-        {
-          // 카테고리 첫 페이지는 짧은 캐시를 사용해 재진입 속도를 높입니다.
-          // 카테고리 첫 로딩은 최신 목록을 즉시 반영하기 위해 no-store를 사용합니다.
-          cache: "no-store",
-        },
       )
 
       if (!firstResponse.ok) {
@@ -132,13 +128,9 @@ export default function CategoryPage() {
       pageSize: "12",
     })
 
+    // 무한 스크롤 페이지도 캐시 재사용을 허용해 같은 조건 재방문 지연을 줄입니다.
     const response = await fetch(
       `${apiRoutes.routes.products.routes.infinite.path}?${query.toString()}`,
-      {
-        // 무한 스크롤 페이지도 짧은 캐시를 사용해 추가 로딩 지연을 줄입니다.
-        // 무한 스크롤 추가 페이지도 캐시 재사용 없이 최신 데이터를 조회합니다.
-        cache: "no-store",
-      },
     )
 
     if (!response.ok) {
@@ -164,11 +156,12 @@ export default function CategoryPage() {
     queryFn: fetchProducts,
     getNextPageParam: lastPage => (lastPage?.hasMore ? lastPage.page + 1 : undefined),
     initialPageParam: 1,
-    // 카테고리 사진은 매번 재요청하지 않도록 기본 캐시 시간을 지정합니다.
-    // 카테고리 목록은 라우트 이동 시 즉시 재검증합니다.
-    staleTime: 0,
-    gcTime: 5 * 60_000,
+    // 같은 카테고리 재진입에서는 1분 동안 즉시 캐시를 재사용해 체감 로딩을 줄입니다.
+    staleTime: 60_000,
+    // 카테고리 캐시는 20분 동안 유지해 뒤로 가기/재진입 시 재요청을 줄입니다.
+    gcTime: 20 * 60_000,
     refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
     retry: 1,
   })
 

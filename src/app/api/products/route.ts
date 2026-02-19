@@ -10,17 +10,11 @@ import prismaClient from "@/lib/prismaClient"
 
 // DB와 가까운 리전을 우선 사용해서 첫 응답 시간을 줄입니다.
 export const preferredRegion = "syd1"
-// 상품 미디어 키가 바뀌면 즉시 반영되어야 하므로 정적 캐시를 비활성화합니다.
-export const dynamic = "force-dynamic"
-// Next.js의 라우트 재검증 캐시도 함께 끕니다.
-export const revalidate = 0
-// 도메인별 엣지 캐시 차이로 오래된 목록이 보이지 않도록 강한 no-store 헤더를 사용합니다.
+// 목록 재진입 속도를 높이기 위해 브라우저/엣지에 짧게 캐시하고, 뒤에서 최신화합니다.
 const PRODUCT_LIST_RESPONSE_HEADERS = {
-  "Cache-Control": "no-store, no-cache, must-revalidate",
-  "CDN-Cache-Control": "no-store",
-  "Vercel-CDN-Cache-Control": "no-store",
-  Pragma: "no-cache",
-  Expires: "0",
+  "Cache-Control": "public, max-age=30, s-maxage=120, stale-while-revalidate=600",
+  "CDN-Cache-Control": "public, s-maxage=120, stale-while-revalidate=600",
+  "Vercel-CDN-Cache-Control": "public, s-maxage=120, stale-while-revalidate=600",
 } as const
 
 export type ProductImage = {
@@ -114,7 +108,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(products, {
       headers: {
-        // 브라우저와 CDN 모두 캐시를 남기지 않도록 강하게 비활성화합니다.
+        // 공개 상품 목록은 짧은 캐시로 재사용하고, 만료 뒤에는 백그라운드로 재검증합니다.
         ...PRODUCT_LIST_RESPONSE_HEADERS,
       },
     })
