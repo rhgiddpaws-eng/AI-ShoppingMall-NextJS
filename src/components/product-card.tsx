@@ -54,7 +54,7 @@ export default function ProductCard({
   // 동영상이면 <video>, 아니면 <Image>를 렌더링합니다.
   const isVideoMedia = isVideoMediaPath(mediaFallbackSrc)
   // 세로형 룩북 영상이 잘리지 않도록 영상 카드 비율을 더 세로로 잡습니다.
-  const mediaAspectClass = isVideoMedia ? "aspect-[3/4]" : "aspect-[7/8]"
+  const mediaAspectClass = isVideoMedia ? "aspect-[9/16]" : "aspect-[7/8]"
 
   // 카드에 마우스를 올렸을 때 상세 진입 전에 API를 예열합니다.
   const prefetchProductDetail = () => {
