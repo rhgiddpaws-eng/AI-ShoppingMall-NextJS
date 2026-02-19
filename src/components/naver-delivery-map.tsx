@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Script from "next/script"
 import { Bike, MapPin, Navigation } from "lucide-react"
 
@@ -64,6 +64,12 @@ interface NaverDeliveryMapProps {
 
 const DEFAULT_STORE_LAT = 37.480783
 const DEFAULT_STORE_LNG = 126.89711
+type ScriptKeyParam = "ncpKeyId" | "ncpClientId"
+
+// 브라우저에서 바로 읽을 수 있는 공개 키가 있으면 우선 사용해 초기 로딩 지연을 줄입니다.
+const PUBLIC_NAVER_MAPS_CLIENT_ID = (
+  process.env.NEXT_PUBLIC_NAVER_MAPS_CLIENT_ID ?? ""
+).trim()
 
 // 준비/배송중/도착예정/배송완료 단계에서 라이더 좌표를 지도에 표시합니다.
 const TRACKING_STATUSES: DeliveryStatus[] = [
@@ -168,10 +174,14 @@ export function NaverDeliveryMap({
   // 이전 좌표를 기억해 다음 갱신 때 라이더 마커 이동 애니메이션 시작점으로 사용합니다.
   const previousRiderPointRef = useRef<RoutePoint | null>(null)
 
-  const [clientId, setClientId] = useState("")
-  const [isClientIdLoaded, setIsClientIdLoaded] = useState(false)
+  const [clientId, setClientId] = useState(PUBLIC_NAVER_MAPS_CLIENT_ID)
+  const [isClientIdLoaded, setIsClientIdLoaded] = useState(
+    PUBLIC_NAVER_MAPS_CLIENT_ID.length > 0,
+  )
   const [isReady, setIsReady] = useState(false)
   const [isScriptError, setIsScriptError] = useState(false)
+  const [scriptKeyParam, setScriptKeyParam] = useState<ScriptKeyParam>("ncpKeyId")
+  const [didRetryScript, setDidRetryScript] = useState(false)
   const [roadRouteEnabled, setRoadRouteEnabled] = useState(true)
 
   const hasClientId = clientId.trim().length > 0
@@ -192,22 +202,35 @@ export function NaverDeliveryMap({
     previousRiderPointRef.current = null
   }, [shippingLat, shippingLng])
 
-  // ncpClientId, ncpKeyId 둘 다 전달해서 콘솔 키 설정 방식 차이로 인한 미노출을 줄입니다.
+  // 기본은 공식 문서 파라미터(ncpKeyId)를 사용하고, 실패 시 ncpClientId로 한 번만 폴백합니다.
   const scriptSrc = useMemo(() => {
     const encoded = encodeURIComponent(clientId)
-    return `https://oapi.map.naver.com/openapi/v3/maps.js?ncpClientId=${encoded}&ncpKeyId=${encoded}`
-  }, [clientId])
+    return `https://oapi.map.naver.com/openapi/v3/maps.js?${scriptKeyParam}=${encoded}`
+  }, [clientId, scriptKeyParam])
 
   useEffect(() => {
     let cancelled = false
 
     const loadClientId = async () => {
+      // 공개 환경변수가 있으면 API 조회 없이 바로 사용합니다.
+      if (clientId.trim().length > 0) {
+        if (!cancelled) setIsClientIdLoaded(true)
+        return
+      }
+
       // 간헐적인 네트워크 실패가 있어도 지도가 바로 복구되도록 짧게 재시도합니다.
       const MAX_ATTEMPTS = 3
 
       for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
+        const controller = new AbortController()
+        // API가 무한 대기 상태가 되지 않게 요청 타임아웃을 둡니다.
+        const timeoutId = window.setTimeout(() => controller.abort(), 3000)
+
         try {
-          const response = await fetch("/api/naver/client-id", { cache: "no-store" })
+          const response = await fetch("/api/naver/client-id", {
+            cache: "no-store",
+            signal: controller.signal,
+          })
           if (!response.ok) {
             throw new Error(`client-id fetch failed: ${response.status}`)
           }
@@ -218,10 +241,13 @@ export function NaverDeliveryMap({
           if (!cancelled && resolvedClientId.length > 0) {
             setClientId(resolvedClientId)
             setIsClientIdLoaded(true)
+            window.clearTimeout(timeoutId)
             return
           }
         } catch (error) {
           console.error("map client id load error:", error)
+        } finally {
+          window.clearTimeout(timeoutId)
         }
 
         if (cancelled || attempt === MAX_ATTEMPTS) break
@@ -241,11 +267,57 @@ export function NaverDeliveryMap({
     return () => {
       cancelled = true
     }
+  }, [clientId])
+
+  const swapScriptKeyParam = useCallback(() => {
+    // 서로 다른 콘솔 설정 호환을 위해 파라미터 키를 한 번 교체해 재시도합니다.
+    setScriptKeyParam(prev => (prev === "ncpKeyId" ? "ncpClientId" : "ncpKeyId"))
+    setIsReady(false)
+    setIsScriptError(false)
   }, [])
+
+  const handleScriptLoad = useCallback(() => {
+    const MAX_CHECKS = 40
+    let checks = 0
+
+    const checkReady = () => {
+      if (window.naver?.maps) {
+        setIsReady(true)
+        setIsScriptError(false)
+        return
+      }
+
+      checks += 1
+      if (checks >= MAX_CHECKS) {
+        if (!didRetryScript) {
+          setDidRetryScript(true)
+          swapScriptKeyParam()
+          return
+        }
+        setIsScriptError(true)
+        return
+      }
+
+      window.setTimeout(checkReady, 100)
+    }
+
+    // 스크립트 onLoad 직후 초기화 지연이 있을 수 있어 짧게 준비 상태를 확인합니다.
+    checkReady()
+  }, [didRetryScript, swapScriptKeyParam])
+
+  const handleScriptError = useCallback(() => {
+    if (!didRetryScript) {
+      setDidRetryScript(true)
+      swapScriptKeyParam()
+      return
+    }
+    setIsScriptError(true)
+  }, [didRetryScript, swapScriptKeyParam])
 
   useEffect(() => {
     if (typeof window !== "undefined" && window.naver?.maps) {
       setIsReady(true)
+      setIsScriptError(false)
     }
   }, [])
 
@@ -568,10 +640,11 @@ export function NaverDeliveryMap({
   return (
     <div className="space-y-3">
       <Script
+        key={scriptSrc}
         src={scriptSrc}
         strategy="afterInteractive"
-        onLoad={() => setIsReady(true)}
-        onError={() => setIsScriptError(true)}
+        onLoad={handleScriptLoad}
+        onError={handleScriptError}
       />
 
       <div className="rounded-xl border bg-background p-3">
