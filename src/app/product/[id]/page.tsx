@@ -238,7 +238,8 @@ export default function ProductPage() {
             <video
               src={mediaUrl}
               poster={mediaPosterUrl}
-              className="h-full w-full object-contain"
+              // 상세 영상에서도 레터박스가 과하게 보이지 않도록 화면을 꽉 채워 표시합니다.
+              className="h-full w-full object-cover"
               autoPlay
               muted
               loop
