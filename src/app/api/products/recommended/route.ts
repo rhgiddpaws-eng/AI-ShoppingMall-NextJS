@@ -41,7 +41,7 @@ function toRecommendedItem(product: ProductWithImage) {
     name: product.name,
     price: product.price,
     category: product.category ?? "기타",
-    // 원본이 동영상이면 카드에서도 동영상을 보여주고, 아니면 썸네일을 우선 사용합니다.
+    // 카드 첫 진입 안정성을 위해 동영상 상품도 썸네일 이미지를 우선 사용합니다.
     imageSrc: getCdnUrl(pickCardMediaKey(product.images[0])),
   }
 }
@@ -72,7 +72,7 @@ async function findFallbackProducts(
       category: true,
       images: {
         take: 1,
-        // 동영상이 있으면 추천 카드에서도 동영상이 먼저 보이도록 정렬합니다.
+        // 동영상 상품의 썸네일을 안정적으로 찾기 위해 동영상 슬롯을 우선 정렬합니다.
         orderBy: [{ mediaType: "desc" }, { id: "asc" }],
         select: {
           id: true,
@@ -102,7 +102,7 @@ async function findFallbackProducts(
       category: true,
       images: {
         take: 1,
-        // 동영상이 있으면 추천 카드에서도 동영상이 먼저 보이도록 정렬합니다.
+        // 동영상 상품의 썸네일을 안정적으로 찾기 위해 동영상 슬롯을 우선 정렬합니다.
         orderBy: [{ mediaType: "desc" }, { id: "asc" }],
         select: {
           id: true,
@@ -185,7 +185,7 @@ export async function GET(request: Request) {
           category: true,
           images: {
             take: 1,
-            // 동영상이 있으면 추천 카드에서도 동영상이 먼저 보이도록 정렬합니다.
+            // 동영상 상품의 썸네일을 안정적으로 찾기 위해 동영상 슬롯을 우선 정렬합니다.
             orderBy: [{ mediaType: "desc" }, { id: "asc" }],
             select: {
               id: true,

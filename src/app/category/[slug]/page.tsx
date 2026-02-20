@@ -259,7 +259,7 @@ export default function CategoryPage() {
                 id={product.id.toString()}
                 name={product.name}
                 price={product.price}
-                // 원본이 동영상이면 카드에서 동영상이 나오도록 대표 미디어 키를 계산합니다.
+                // 카드 첫 진입 안정성을 위해 동영상 상품도 썸네일 이미지를 우선 사용합니다.
                 imageSrc={getCdnUrl(pickCardMediaKey(product.images?.[0]))}
                 category={product.category || "기타"}
               />

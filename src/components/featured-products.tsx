@@ -44,7 +44,7 @@ interface ProductData {
     id: number
     original: string
     thumbnail: string
-    // DB에서 내려준 mediaType으로 카드에서 이미지/동영상을 안정적으로 분기합니다.
+    // DB mediaType으로 카드용 썸네일/원본 fallback 경로를 안정적으로 고릅니다.
     mediaType: 'image' | 'video'
   }[]
 }
@@ -73,7 +73,7 @@ function toFormattedProducts(products: ProductData[]): FormattedProduct[] {
       id: product.id.toString(),
       name: product.name,
       price: product.price,
-      // 원본이 동영상이면 동영상 키를 우선 사용해 카드에서 자동 분기 렌더링합니다.
+      // 카드 첫 진입 안정성을 위해 동영상 상품도 썸네일 이미지를 우선 사용합니다.
       imageSrc: getCdnUrl(pickCardMediaKey(product.images?.[0])),
       category: product.category || '기타',
       isNew: new Date(product.createdAt) > oneWeekAgo,
