@@ -29,7 +29,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import useInputDebounce from "@/hooks/useInputDebounce"
 import { apiRoutes } from "@/lib/apiRoutes"
 import { getCdnUrl } from "@/lib/cdn"
-import { pickCardMediaKey } from "@/lib/media"
+import { pickCardMediaSources } from "@/lib/media"
 
 type InfiniteProductsResponse = {
   products: Array<{
@@ -253,17 +253,22 @@ export default function CategoryPage() {
       ) : (
         <>
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-            {allProducts.map(product => (
-              <ProductCard
-                key={product.id}
-                id={product.id.toString()}
-                name={product.name}
-                price={product.price}
-                // 카드 첫 진입 안정성을 위해 동영상 상품도 썸네일 이미지를 우선 사용합니다.
-                imageSrc={getCdnUrl(pickCardMediaKey(product.images?.[0]))}
-                category={product.category || "기타"}
-              />
-            ))}
+            {allProducts.map(product => {
+              const mediaSources = pickCardMediaSources(product.images?.[0])
+
+              return (
+                <ProductCard
+                  key={product.id}
+                  id={product.id.toString()}
+                  name={product.name}
+                  price={product.price}
+                  // 카드에서는 썸네일을 먼저 보여주고, 준비된 뒤 동영상으로 전환할 수 있게 두 소스를 함께 전달합니다.
+                  imageSrc={getCdnUrl(mediaSources.thumbnailKey)}
+                  videoSrc={mediaSources.videoKey ? getCdnUrl(mediaSources.videoKey) : undefined}
+                  category={product.category || "기타"}
+                />
+              )
+            })}
           </div>
 
           <div ref={ref} className="mt-8 flex justify-center">

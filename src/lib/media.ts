@@ -1,8 +1,14 @@
-/**
+﻿/**
  * 파일 경로/URL에서 확장자를 안전하게 추출합니다.
  * - 쿼리스트링/해시가 붙어 있어도 확장자 판별이 가능해야 합니다.
  */
 export type MediaTypeValue = "image" | "video"
+
+/** 카드에서 사용할 미디어 소스 집합 타입입니다. */
+export type CardMediaSources = {
+  thumbnailKey: string
+  videoKey?: string
+}
 
 function getNormalizedExt(pathOrUrl: string): string {
   const [withoutQuery] = pathOrUrl.split("?")
@@ -31,9 +37,57 @@ export function isVideoMediaType(mediaType: string | null | undefined): boolean 
 }
 
 /**
- * 카드에서 사용할 대표 미디어 경로를 고릅니다.
- * - 카드 첫 진입 안정성을 위해 동영상도 썸네일 이미지를 우선 사용합니다.
- * - 썸네일이 없을 때만 원본 경로로 fallback 합니다.
+ * 카드 렌더링에 필요한 썸네일/동영상 경로를 함께 계산합니다.
+ * - 동영상 상품이라도 썸네일을 먼저 보여준 뒤, 준비되면 동영상을 노출할 수 있게 두 값을 모두 반환합니다.
+ */
+export function pickCardMediaSources(
+  media:
+    | {
+        original?: string | null
+        thumbnail?: string | null
+        mediaType?: MediaTypeValue | string | null
+      }
+    | null
+    | undefined,
+): CardMediaSources {
+  if (!media) {
+    return { thumbnailKey: "" }
+  }
+
+  const original = media.original ?? ""
+  const thumbnail = media.thumbnail ?? ""
+  const mediaTypeLower = media.mediaType?.toLowerCase()
+  const originalIsVideo = isVideoMediaPath(original)
+  const thumbnailIsVideo = isVideoMediaPath(thumbnail)
+
+  // DB 값 또는 확장자상 동영상이면 동영상 경로를 따로 보관하고, 썸네일 이미지를 우선 사용합니다.
+  if (isVideoMediaType(mediaTypeLower) || originalIsVideo || thumbnailIsVideo) {
+    const videoKey = originalIsVideo ? original : thumbnailIsVideo ? thumbnail : ""
+    const thumbnailKey = !thumbnailIsVideo && thumbnail ? thumbnail : ""
+
+    if (videoKey) {
+      return {
+        thumbnailKey: thumbnailKey || original || thumbnail,
+        videoKey,
+      }
+    }
+
+    return {
+      thumbnailKey: thumbnail || original,
+    }
+  }
+
+  // 이미지 상품은 기존처럼 썸네일 우선 정책을 유지합니다.
+  if (mediaTypeLower === "image") {
+    return { thumbnailKey: thumbnail || original }
+  }
+
+  return { thumbnailKey: thumbnail || original }
+}
+
+/**
+ * 카드에서 사용할 기본 썸네일 경로만 필요할 때의 호환 함수입니다.
+ * - 기존 호출부를 유지하기 위해 썸네일 키만 반환합니다.
  */
 export function pickCardMediaKey(
   media:
@@ -45,20 +99,5 @@ export function pickCardMediaKey(
     | null
     | undefined,
 ): string {
-  if (!media) return ""
-
-  const original = media.original ?? ""
-  const thumbnail = media.thumbnail ?? ""
-  const originalIsVideo = isVideoMediaPath(original)
-  const thumbnailIsVideo = isVideoMediaPath(thumbnail)
-
-  // 카드 첫 진입에서 동영상 로드 실패로 빈 화면이 보이지 않도록 썸네일을 우선 노출합니다.
-  if (isVideoMediaType(media.mediaType) || originalIsVideo || thumbnailIsVideo) {
-    if (thumbnail && !thumbnailIsVideo) return thumbnail
-    if (original) return original
-    return thumbnail
-  }
-
-  if (media.mediaType?.toLowerCase() === "image") return thumbnail || original
-  return thumbnail || original
+  return pickCardMediaSources(media).thumbnailKey
 }

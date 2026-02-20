@@ -7,7 +7,7 @@ import { NextResponse } from "next/server"
 
 import prismaClient from "@/lib/prismaClient"
 import { getCdnUrl } from "@/lib/cdn"
-import { pickCardMediaKey } from "@/lib/media"
+import { pickCardMediaSources } from "@/lib/media"
 
 // DB와 가까운 리전을 우선 사용해서 추천 쿼리 응답 시간을 줄입니다.
 export const preferredRegion = "syd1"
@@ -36,13 +36,15 @@ type ProductWithImage = {
 }
 
 function toRecommendedItem(product: ProductWithImage) {
+  const mediaSources = pickCardMediaSources(product.images[0])
   return {
     id: product.id,
     name: product.name,
     price: product.price,
     category: product.category ?? "기타",
-    // 카드 첫 진입 안정성을 위해 동영상 상품도 썸네일 이미지를 우선 사용합니다.
-    imageSrc: getCdnUrl(pickCardMediaKey(product.images[0])),
+    // 카드에서는 썸네일을 먼저 보여주고, 준비된 뒤 동영상으로 전환할 수 있게 두 소스를 함께 전달합니다.
+    imageSrc: getCdnUrl(mediaSources.thumbnailKey),
+    videoSrc: mediaSources.videoKey ? getCdnUrl(mediaSources.videoKey) : undefined,
   }
 }
 

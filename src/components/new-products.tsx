@@ -12,7 +12,7 @@ import ProductCard from '@/components/product-card'
 import { ProductCardSkeleton } from '@/components/product-card-skeleton'
 import { apiRoutes } from '@/lib/apiRoutes'
 import { getCdnUrl } from '@/lib/cdn'
-import { pickCardMediaKey } from '@/lib/media'
+import { pickCardMediaSources } from '@/lib/media'
 import { isProductInSet, mergePinnedFirst } from '@/lib/product-set'
 import { safeParseJson } from '@/lib/utils'
 
@@ -83,17 +83,22 @@ export function NewProducts() {
 
   return (
     <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:gap-6 lg:grid-cols-4">
-      {products.map(product => (
-        <ProductCard
-          key={product.id}
-          id={product.id.toString()}
-          name={product.name}
-          price={product.price}
-          // 카드 첫 진입 안정성을 위해 동영상 상품도 썸네일 이미지를 우선 사용합니다.
-          imageSrc={getCdnUrl(pickCardMediaKey(product.images?.[0]))}
-          isNew={true}
-        />
-      ))}
+      {products.map(product => {
+        const mediaSources = pickCardMediaSources(product.images?.[0])
+
+        return (
+          <ProductCard
+            key={product.id}
+            id={product.id.toString()}
+            name={product.name}
+            price={product.price}
+            // 카드에서는 썸네일을 먼저 보여주고, 준비된 뒤 동영상으로 전환할 수 있게 두 소스를 함께 전달합니다.
+            imageSrc={getCdnUrl(mediaSources.thumbnailKey)}
+            videoSrc={mediaSources.videoKey ? getCdnUrl(mediaSources.videoKey) : undefined}
+            isNew={true}
+          />
+        )
+      })}
     </div>
   )
 }

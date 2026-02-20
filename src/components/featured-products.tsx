@@ -15,7 +15,7 @@ import { ProductCardSkeleton } from '@/components/product-card-skeleton'
 import { Button } from '@/components/ui/button'
 import { apiRoutes } from '@/lib/apiRoutes'
 import { getCdnUrl } from '@/lib/cdn'
-import { pickCardMediaKey } from '@/lib/media'
+import { pickCardMediaSources } from '@/lib/media'
 import { isProductInSet, mergePinnedFirst } from '@/lib/product-set'
 import { safeParseJson } from '@/lib/utils'
 
@@ -54,6 +54,7 @@ interface FormattedProduct {
   name: string
   price: number
   imageSrc: string
+  videoSrc?: string
   category: string
   isNew?: boolean
   isSale?: boolean
@@ -68,13 +69,15 @@ function toFormattedProducts(products: ProductData[]): FormattedProduct[] {
   return products.map(product => {
     const discountAmount = product.price * (product.discountRate / 100)
     const salePrice = product.price - discountAmount
+    const mediaSources = pickCardMediaSources(product.images?.[0])
 
     return {
       id: product.id.toString(),
       name: product.name,
       price: product.price,
-      // 카드 첫 진입 안정성을 위해 동영상 상품도 썸네일 이미지를 우선 사용합니다.
-      imageSrc: getCdnUrl(pickCardMediaKey(product.images?.[0])),
+      // 카드에서는 썸네일을 먼저 보여주고, 준비된 뒤 동영상으로 전환할 수 있게 두 소스를 함께 전달합니다.
+      imageSrc: getCdnUrl(mediaSources.thumbnailKey),
+      videoSrc: mediaSources.videoKey ? getCdnUrl(mediaSources.videoKey) : undefined,
       category: product.category || '기타',
       isNew: new Date(product.createdAt) > oneWeekAgo,
       isSale: product.discountRate > 0,
@@ -193,6 +196,7 @@ export function FeaturedProducts() {
             name={product.name}
             price={product.price}
             imageSrc={product.imageSrc}
+            videoSrc={product.videoSrc}
             category={product.category}
             isNew={product.isNew}
             isSale={product.isSale}

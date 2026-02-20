@@ -35,6 +35,7 @@ interface Product {
   name: string
   price: number
   imageSrc: string
+  videoSrc?: string
   category: string
 }
 
@@ -107,6 +108,7 @@ export function RecommendedProducts({ currentProductId }: RecommendedProductsPro
             name={product.name}
             price={product.price}
             imageSrc={product.imageSrc}
+            videoSrc={product.videoSrc}
             category={product.category}
           />
         ))}
