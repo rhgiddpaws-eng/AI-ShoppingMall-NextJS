@@ -1,0 +1,11 @@
+   ▲ Next.js 15.5.9
+   - Environments: .env.production, .env
+
+   Creating an optimized production build ...
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, rename 'D:\AAA FastCampus Source AAA\Web\NOW\AI-ShoppingMall-NextJS\.next\cache\webpack\server-production\16.pack_' -> 'D:\AAA FastCampus Source AAA\Web\NOW\AI-ShoppingMall-NextJS\.next\cache\webpack\server-production\16.pack'
+uncaughtException [Error: EPERM: operation not permitted, open 'D:\AAA FastCampus Source AAA\Web\NOW\AI-ShoppingMall-NextJS\.next\trace'] {
+  errno: -4048,
+  code: 'EPERM',
+  syscall: 'open',
+  path: 'D:\\AAA FastCampus Source AAA\\Web\\NOW\\AI-ShoppingMall-NextJS\\.next\\trace'
+}

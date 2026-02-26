@@ -2,28 +2,55 @@
 
 /**
  * 히어로 섹션입니다.
- * - GIF, 비디오, 포스터 이미지를 순서대로 선택해서 배경으로 표시합니다.
- * - 중앙 텍스트/CTA 버튼은 framer-motion으로 부드럽게 노출합니다.
+ * - 첫 화면은 포스터 이미지로 빠르게 그립니다.
+ * - 동영상은 첫 페인트 이후, 네트워크가 괜찮을 때만 지연 로딩합니다.
  */
 
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
-import { motion } from "framer-motion"
 import { Sparkles } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 
-// 히어로 기본 포스터에도 버전 쿼리를 붙여 캐시된 이전 이미지 노출을 막습니다.
+// 히어로 기본 포스터에 버전 쿼리를 붙여 캐시된 이전 이미지를 노출하지 않도록 합니다.
 const HERO_ASSET_VERSION =
   process.env.NEXT_PUBLIC_HERO_ASSET_VERSION || "20260217-hero-1"
 const defaultImageSrc = `/main/1.webp?v=${encodeURIComponent(HERO_ASSET_VERSION)}`
+// 첫 진입 시 LCP를 먼저 안정화하기 위해 비디오 로딩을 잠시 뒤로 미룹니다.
+const HERO_VIDEO_DEFER_MS = 1500
+
+type NavigatorConnection = {
+  saveData?: boolean
+  effectiveType?: string
+}
+
+function canDeferLoadVideo() {
+  if (typeof window === "undefined") return false
+
+  // 절약 모드/저속 네트워크에서는 동영상 로딩을 건너뛰어 초기 체감을 우선합니다.
+  const connection = (navigator as Navigator & { connection?: NavigatorConnection })
+    .connection
+  if (connection?.saveData) return false
+
+  const effectiveType = (connection?.effectiveType || "").toLowerCase()
+  if (
+    effectiveType === "slow-2g" ||
+    effectiveType === "2g" ||
+    effectiveType === "3g"
+  ) {
+    return false
+  }
+
+  return true
+}
 
 export function HeroSection({
   gifSrc,
   videoSrc,
   posterSrc = defaultImageSrc,
-  title = "뉴 시즌 컬렉션 출시",
-  subtitle = "최신 트렌드로 스타일을 완성해 보세요",
+  title = "신규 시즌 컬렉션 출시",
+  subtitle = "최신 트렌드로 스타일을 완성해 보세요.",
 }: {
   gifSrc?: string
   videoSrc?: string
@@ -31,6 +58,40 @@ export function HeroSection({
   title?: string
   subtitle?: string
 }) {
+  const [shouldLoadVideo, setShouldLoadVideo] = useState(false)
+
+  useEffect(() => {
+    if (!videoSrc) return
+    if (!canDeferLoadVideo()) return
+
+    const browserGlobal = globalThis as typeof globalThis & {
+      requestIdleCallback?: (callback: () => void) => number
+      cancelIdleCallback?: (handle: number) => void
+    }
+
+    let timeoutId: number | undefined
+    let idleId: number | undefined
+
+    if (typeof browserGlobal.requestIdleCallback === "function") {
+      idleId = browserGlobal.requestIdleCallback(() => {
+        timeoutId = window.setTimeout(() => {
+          setShouldLoadVideo(true)
+        }, HERO_VIDEO_DEFER_MS)
+      })
+    } else {
+      timeoutId = window.setTimeout(() => {
+        setShouldLoadVideo(true)
+      }, HERO_VIDEO_DEFER_MS)
+    }
+
+    return () => {
+      if (timeoutId) window.clearTimeout(timeoutId)
+      if (idleId && typeof browserGlobal.cancelIdleCallback === "function") {
+        browserGlobal.cancelIdleCallback(idleId)
+      }
+    }
+  }, [videoSrc])
+
   return (
     <section className="relative">
       <div className="relative h-[400px] w-full overflow-hidden sm:h-[500px] md:h-[600px] lg:h-[800px]">
@@ -44,14 +105,14 @@ export function HeroSection({
             priority
             unoptimized
           />
-        ) : videoSrc ? (
+        ) : shouldLoadVideo && videoSrc ? (
           <video
             autoPlay
             muted
             loop
             playsInline
-            // 전체 파일을 먼저 받지 않고 메타데이터만 받아 첫 렌더를 빠르게 유지합니다.
-            preload="metadata"
+            // 첫 진입 대역폭 경쟁을 줄이기 위해 동영상은 필요한 시점에만 받습니다.
+            preload="none"
             poster={posterSrc}
             className="absolute inset-0 h-full w-full object-cover"
           >
@@ -74,40 +135,20 @@ export function HeroSection({
         </div>
 
         <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-white">
-          <motion.div
-            className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/30 bg-black/25 px-3 py-1 text-xs font-medium backdrop-blur"
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.45 }}
-          >
+          <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/30 bg-black/25 px-3 py-1 text-xs font-medium backdrop-blur">
             <Sparkles className="h-3.5 w-3.5" />
             New Season Curation
-          </motion.div>
+          </div>
 
-          <motion.h1
-            className="mb-3 text-center text-2xl font-bold tracking-tight sm:mb-4 sm:text-4xl md:text-5xl lg:text-6xl"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-          >
+          <h1 className="mb-3 text-center text-2xl font-bold tracking-tight sm:mb-4 sm:text-4xl md:text-5xl lg:text-6xl">
             {title}
-          </motion.h1>
+          </h1>
 
-          <motion.p
-            className="mb-4 max-w-2xl text-center text-base text-white/90 sm:mb-6 sm:text-lg md:text-xl"
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.15 }}
-          >
+          <p className="mb-4 max-w-2xl text-center text-base text-white/90 sm:mb-6 sm:text-lg md:text-xl">
             {subtitle}
-          </motion.p>
+          </p>
 
-          <motion.div
-            className="flex flex-wrap justify-center gap-3 sm:gap-4"
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.25 }}
-          >
+          <div className="flex flex-wrap justify-center gap-3 sm:gap-4">
             <Button size="lg" asChild className="min-h-[44px] min-w-[120px] shadow-xl shadow-black/20">
               <Link href="/category/new">신상품 보기</Link>
             </Button>
@@ -119,7 +160,7 @@ export function HeroSection({
             >
               <Link href="/category/sale">세일 상품</Link>
             </Button>
-          </motion.div>
+          </div>
         </div>
       </div>
     </section>

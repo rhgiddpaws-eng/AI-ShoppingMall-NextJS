@@ -14,6 +14,7 @@ import { NavBar } from "@/components/NavBar"
 import { NewProducts } from "@/components/new-products"
 import { Button } from "@/components/ui/button"
 import { getCdnUrl } from "@/lib/cdn"
+import { getHomeProducts } from "@/lib/server/home-products"
 
 // 히어로 에셋 캐시 무효화 버전입니다. 이미지가 갱신되지 않으면 이 값만 올리면 됩니다.
 const HERO_ASSET_VERSION =
@@ -25,7 +26,11 @@ const withAssetVersion = (src: string) => {
   return `${src}${separator}v=${encodeURIComponent(HERO_ASSET_VERSION)}`
 }
 
-export default function Home() {
+export default async function Home() {
+  // 서버에서 상품 데이터를 미리 가져와 HTML에 포함시킵니다.
+  // 기존: 클라이언트에서 4건 API 호출 (limit=8 x2, limit=100 x2) → 워터폴 발생
+  // 개선: 서버에서 1건 DB 쿼리 → HTML에 데이터 포함 → 즉시 렌더링
+  const { featured, newProducts } = await getHomeProducts()
   const heroGifSrc =
     typeof process.env.NEXT_PUBLIC_HERO_GIF_URL === "string"
       ? withAssetVersion(process.env.NEXT_PUBLIC_HERO_GIF_URL)
@@ -101,7 +106,7 @@ export default function Home() {
               </p>
               <h2 className="mt-1 text-2xl font-bold md:text-3xl">인기 상품</h2>
             </div>
-            <FeaturedProducts />
+            <FeaturedProducts initialData={featured} />
           </div>
         </section>
 
@@ -112,7 +117,7 @@ export default function Home() {
             </p>
             <h2 className="mt-1 text-2xl font-bold md:text-3xl">신상품</h2>
           </div>
-          <NewProducts />
+          <NewProducts initialData={newProducts} />
           <div className="mt-8 text-center">
             <Button size="lg" variant="outline" asChild>
               <Link href="/category/new">더 보기</Link>

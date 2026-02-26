@@ -2,6 +2,7 @@
 
 /**
  * FeaturedProducts: 메인 추천 상품 캐러셀
+ * - 서버에서 프리페칭된 initialData가 있으면 즉시 렌더링합니다 (스켈레톤 없음).
  * - "2번 상품" 세트를 항상 앞쪽에 고정 노출합니다.
  * - 나머지 칸은 최신 상품으로 채웁니다.
  */
@@ -18,6 +19,7 @@ import { getCdnUrl } from '@/lib/cdn'
 import { pickCardMediaSources } from '@/lib/media'
 import { isProductInSet, mergePinnedFirst } from '@/lib/product-set'
 import { safeParseJson } from '@/lib/utils'
+import type { HomeProductItem } from '@/lib/server/home-products'
 
 // 메인에서 고정 노출할 세트 번호입니다.
 const PINNED_SET_NO = 2
@@ -25,8 +27,8 @@ const PINNED_SET_NO = 2
 const FEATURED_LIMIT = 8
 // 고정 세트 후보를 찾기 위해 넉넉히 조회합니다.
 const PIN_SOURCE_LIMIT = 100
-// 같은 홈 재진입에서 즉시 재사용할 수 있도록 추천 캐시 유효 시간을 1분으로 둡니다.
-const FEATURED_STALE_TIME_MS = 60_000
+// 서버 프리페칭 데이터가 있으면 5분간 fresh로 유지해 중복 fetch를 방지합니다.
+const FEATURED_STALE_TIME_MS = 5 * 60_000
 // 추천 캐시는 20분간 보관해 탭 이동/재진입의 재요청을 줄입니다.
 const FEATURED_GC_TIME_MS = 20 * 60_000
 
@@ -44,7 +46,6 @@ interface ProductData {
     id: number
     original: string
     thumbnail: string
-    // DB mediaType으로 카드용 썸네일/원본 fallback 경로를 안정적으로 고릅니다.
     mediaType: 'image' | 'video'
   }[]
 }
@@ -75,7 +76,6 @@ function toFormattedProducts(products: ProductData[]): FormattedProduct[] {
       id: product.id.toString(),
       name: product.name,
       price: product.price,
-      // 카드에서는 썸네일을 먼저 보여주고, 준비된 뒤 동영상으로 전환할 수 있게 두 소스를 함께 전달합니다.
       imageSrc: getCdnUrl(mediaSources.thumbnailKey),
       videoSrc: mediaSources.videoKey ? getCdnUrl(mediaSources.videoKey) : undefined,
       category: product.category || '기타',
@@ -86,9 +86,9 @@ function toFormattedProducts(products: ProductData[]): FormattedProduct[] {
   })
 }
 
+/** 서버 프리페칭이 없을 때의 클라이언트 fallback fetch 함수입니다. */
 async function fetchFeaturedProducts(): Promise<FormattedProduct[]> {
   try {
-    // 최신 목록과 고정 세트 후보를 동시에 가져와서 합성합니다.
     const [latestResponse, pinSourceResponse] = await Promise.all([
       fetch(`${apiRoutes.routes.products.path}?limit=${FEATURED_LIMIT}`),
       fetch(`${apiRoutes.routes.products.path}?limit=${PIN_SOURCE_LIMIT}&sort=id&order=asc`),
@@ -100,7 +100,6 @@ async function fetchFeaturedProducts(): Promise<FormattedProduct[]> {
     const latestRows: ProductData[] = Array.isArray(latestRaw) ? latestRaw : []
     const pinSourceRows: ProductData[] = Array.isArray(pinSourceRaw) ? pinSourceRaw : []
 
-    // 세트 번호를 정확히 파싱해서 12번/22번 오매칭을 방지합니다.
     const pinnedRows = pinSourceRows.filter(product =>
       isProductInSet(product.name, PINNED_SET_NO),
     )
@@ -113,17 +112,30 @@ async function fetchFeaturedProducts(): Promise<FormattedProduct[]> {
   }
 }
 
-export function FeaturedProducts() {
+interface FeaturedProductsProps {
+  /** 서버에서 프리페칭된 데이터. 있으면 스켈레톤 없이 즉시 렌더링됩니다. */
+  initialData?: HomeProductItem[]
+}
+
+export function FeaturedProducts({ initialData }: FeaturedProductsProps) {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isMobile, setIsMobile] = useState(false)
+
+  // initialData가 있으면 React Query initialData로 바로 사용 → 클라이언트 fetch 생략
+  const hasServerData = initialData && initialData.length > 0
+
   const { data: featuredProducts = [], isPending } = useQuery({
     queryKey: ['products', 'featured'],
     queryFn: fetchFeaturedProducts,
-    // 홈에 다시 들어왔을 때 스켈레톤 대신 직전 데이터를 바로 보여주기 위한 설정입니다.
-    staleTime: FEATURED_STALE_TIME_MS,
+    // 서버 프리페칭 데이터가 있으면 초기 fetch를 건너뛰고 캐시로 사용합니다.
+    initialData: hasServerData ? (initialData as FormattedProduct[]) : undefined,
+    // 서버 데이터가 있으면 staleTime을 높게 잡아 불필요한 재요청을 막습니다.
+    staleTime: hasServerData ? FEATURED_STALE_TIME_MS : 60_000,
     gcTime: FEATURED_GC_TIME_MS,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
+    // 서버 데이터가 있으면 마운트 시 재요청하지 않습니다.
+    refetchOnMount: !hasServerData,
     retry: 1,
   })
 
@@ -145,7 +157,6 @@ export function FeaturedProducts() {
   const isLoading = isPending && featuredProducts.length === 0
 
   useEffect(() => {
-    // 데이터 개수가 바뀌어 페이지 수가 줄어들면 첫 페이지로 안전하게 되돌립니다.
     if (totalPages === 0) {
       setCurrentIndex(0)
       return
@@ -231,9 +242,8 @@ export function FeaturedProducts() {
             {Array.from({ length: totalPages }).map((_, index) => (
               <button
                 key={index}
-                className={`h-2 rounded-full transition-all ${
-                  index === currentIndex ? 'w-4 bg-primary' : 'w-2 bg-muted-foreground/30'
-                }`}
+                className={`h-2 rounded-full transition-all ${index === currentIndex ? 'w-4 bg-primary' : 'w-2 bg-muted-foreground/30'
+                  }`}
                 onClick={() => setCurrentIndex(index)}
                 aria-label={`페이지 ${index + 1}`}
               />

@@ -248,8 +248,8 @@ export default function ProductCard({
               muted
               loop
               playsInline
-              // 최초 1회는 충분히 받아 다음 페이지 진입 시 캐시 재사용 확률을 높입니다.
-              preload="auto"
+              // 초기 페이지에서는 영상 대역폭 점유를 줄이기 위해 메타데이터만 먼저 받습니다.
+              preload="metadata"
               onLoadedData={revealVideoLayer}
               onCanPlay={revealVideoLayer}
               onError={handleVideoError}

@@ -2,8 +2,8 @@
 
 /**
  * 상단 네비게이션 바입니다.
- * - 브랜드 로고, 카테고리 메뉴, 검색, 계정/위시리스트/장바구니 버튼을 제공합니다.
- * - 검색어 제출 시 /category/new?term=... 으로 이동합니다.
+ * - 로고, 카테고리, 검색, 계정/위시리스트/장바구니 버튼을 제공합니다.
+ * - 초기 렌더 직후 예열 트래픽이 몰리지 않도록 워밍업 시점을 늦춥니다.
  */
 
 import { FormEvent, useEffect, useState } from "react"
@@ -37,6 +37,11 @@ type CategoryLink = {
   className?: string
 }
 
+type NavigatorConnection = {
+  saveData?: boolean
+  effectiveType?: string
+}
+
 const categoryLinks: CategoryLink[] = [
   { href: "/category/men", label: "남성" },
   { href: "/category/women", label: "여성" },
@@ -45,6 +50,24 @@ const categoryLinks: CategoryLink[] = [
   { href: "/category/sale", label: "세일", className: "text-red-500" },
 ]
 
+const NAV_WARMUP_DELAY_MS = 1500
+
+function shouldSkipNavWarmup() {
+  if (typeof window === "undefined") return true
+
+  // 느린 네트워크에서는 초기 예열보다 첫 화면 응답을 우선합니다.
+  const connection = (navigator as Navigator & { connection?: NavigatorConnection })
+    .connection
+  if (connection?.saveData) return true
+
+  const effectiveType = (connection?.effectiveType || "").toLowerCase()
+  return (
+    effectiveType === "slow-2g" ||
+    effectiveType === "2g" ||
+    effectiveType === "3g"
+  )
+}
+
 export function NavBar() {
   const router = useRouter()
   const { cart, wishlist } = useShopStore()
@@ -52,12 +75,12 @@ export function NavBar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [searchInput, setSearchInput] = useState("")
 
-  // 카테고리 링크에 마우스/포커스가 닿으면 상세 화면 진입 전에 데이터를 미리 예열합니다.
+  // 카테고리 링크에 의도가 보이면 페이지/데이터를 미리 예열해 클릭 지연을 줄입니다.
   const handleCategoryIntent = (href: string) => {
     warmCategoryRoute(router, href)
   }
 
-  // 검색어를 비우면 이동하지 않고, 값이 있으면 검색 결과 페이지로 이동합니다.
+  // 검색어가 비어 있으면 이동하지 않고, 값이 있으면 검색 결과 페이지로 이동합니다.
   const handleSearchSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     const trimmed = searchInput.trim()
@@ -66,8 +89,9 @@ export function NavBar() {
   }
 
   useEffect(() => {
-    // 초기 렌더가 끝난 뒤 여유 시간에 핵심 이동 경로를 미리 prefetch해 첫 페이지 이동 지연을 줄입니다.
+    // 초기 렌더 직후에는 UI 안정화를 먼저 하고, 이후 idle 시점에 워밍업을 수행합니다.
     const runWarmup = () => {
+      if (shouldSkipNavWarmup()) return
       warmPrimaryRoutes(router, Boolean(user))
       if (user) warmLoggedInApis()
     }
@@ -77,13 +101,23 @@ export function NavBar() {
       cancelIdleCallback?: (handle: number) => void
     }
 
-    if (typeof browserGlobal.requestIdleCallback === "function") {
-      const idleId = browserGlobal.requestIdleCallback(() => runWarmup())
-      return () => browserGlobal.cancelIdleCallback?.(idleId)
-    }
+    let warmupTimerId: number | undefined
+    let idleId: number | undefined
 
-    const timeoutId = setTimeout(runWarmup, 120)
-    return () => clearTimeout(timeoutId)
+    warmupTimerId = window.setTimeout(() => {
+      if (typeof browserGlobal.requestIdleCallback === "function") {
+        idleId = browserGlobal.requestIdleCallback(() => runWarmup())
+        return
+      }
+      runWarmup()
+    }, NAV_WARMUP_DELAY_MS)
+
+    return () => {
+      if (warmupTimerId) window.clearTimeout(warmupTimerId)
+      if (idleId && typeof browserGlobal.cancelIdleCallback === "function") {
+        browserGlobal.cancelIdleCallback(idleId)
+      }
+    }
   }, [router, user])
 
   return (
@@ -106,7 +140,6 @@ export function NavBar() {
                     <Link
                       key={href}
                       href={href}
-                      // 주요 카테고리는 기본 prefetch를 켜서 클릭 직후 화면 전환을 빠르게 만듭니다.
                       className={`block py-2 font-medium hover:text-primary ${className ?? ""}`}
                       onTouchStart={() => handleCategoryIntent(href)}
                       onFocus={() => handleCategoryIntent(href)}
@@ -124,18 +157,17 @@ export function NavBar() {
           </div>
 
           <Link href="/" className="flex shrink-0 items-center gap-2">
-            <Image src="/kus-logo.svg" alt="KUS 스타일" width={40} height={40} />
-            <span className="hidden text-xl font-bold sm:inline-block">KUS 스타일</span>
+            <Image src="/kus-logo.svg" alt="KUS 스토어" width={40} height={40} />
+            <span className="hidden text-xl font-bold sm:inline-block">KUS 스토어</span>
           </Link>
 
           {user ? (
-            // 로그인 사용자에게만 좌측 상단에서 바로 관리자 페이지 진입 버튼을 노출합니다.
             <Button variant="outline" size="sm" asChild className="gap-1.5">
               <Link
                 href="/admin"
                 aria-label="관리자 페이지"
                 onMouseEnter={() => {
-                  // 관리자 버튼에 커서가 닿으면 관리자 경로/인증 API를 즉시 예열합니다.
+                  // 관리자 진입 의도가 보일 때만 관리자 관련 경로/API를 예열합니다.
                   warmPrimaryRoutes(router, true)
                   warmAdminApis()
                 }}
@@ -156,7 +188,6 @@ export function NavBar() {
             <Link
               key={href}
               href={href}
-              // 주요 카테고리는 기본 prefetch를 켜서 클릭 직후 화면 전환을 빠르게 만듭니다.
               onMouseEnter={() => handleCategoryIntent(href)}
               onFocus={() => handleCategoryIntent(href)}
               className={`text-sm font-medium hover:text-primary ${className ?? ""}`}

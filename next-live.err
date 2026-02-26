@@ -1,0 +1,6 @@
+uncaughtException [Error: EPERM: operation not permitted, open 'D:\AAA FastCampus Source AAA\Web\NOW\AI-ShoppingMall-NextJS\.next\trace'] {
+  errno: -4048,
+  code: 'EPERM',
+  syscall: 'open',
+  path: 'D:\\AAA FastCampus Source AAA\\Web\\NOW\\AI-ShoppingMall-NextJS\\.next\\trace'
+}
