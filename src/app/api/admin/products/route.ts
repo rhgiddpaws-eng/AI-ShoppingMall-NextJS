@@ -11,6 +11,9 @@ import pool from "@/lib/pgClient"
 import pgvector from "pgvector"
 import type { PrismaTransactionClient } from "@/lib/prismaTransactionClient"
 
+// DB가 ap-southeast-2(Sydney)에 있어 함수 실행 리전도 맞춰 왕복 지연을 줄입니다.
+export const preferredRegion = "syd1"
+
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 })

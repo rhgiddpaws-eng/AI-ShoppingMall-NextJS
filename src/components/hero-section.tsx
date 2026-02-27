@@ -4,9 +4,10 @@
  * 히어로 섹션입니다.
  * - 첫 화면은 포스터 이미지로 빠르게 그립니다.
  * - 동영상은 첫 페인트 이후, 네트워크가 괜찮을 때만 지연 로딩합니다.
+ * - 동영상이 재생 가능 상태가 되면 크로스페이드로 부드럽게 전환합니다.
  */
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { Sparkles } from "lucide-react"
@@ -18,7 +19,7 @@ const HERO_ASSET_VERSION =
   process.env.NEXT_PUBLIC_HERO_ASSET_VERSION || "20260217-hero-1"
 const defaultImageSrc = `/main/1.webp?v=${encodeURIComponent(HERO_ASSET_VERSION)}`
 // 첫 진입 시 LCP를 먼저 안정화하기 위해 비디오 로딩을 잠시 뒤로 미룹니다.
-const HERO_VIDEO_DEFER_MS = 1500
+const HERO_VIDEO_DEFER_MS = 800
 
 type NavigatorConnection = {
   saveData?: boolean
@@ -59,6 +60,9 @@ export function HeroSection({
   subtitle?: string
 }) {
   const [shouldLoadVideo, setShouldLoadVideo] = useState(false)
+  // 비디오가 실제로 재생 가능해지면 true로 전환해 크로스페이드합니다.
+  const [videoReady, setVideoReady] = useState(false)
+  const videoRef = useRef<HTMLVideoElement>(null)
 
   useEffect(() => {
     if (!videoSrc) return
@@ -92,6 +96,11 @@ export function HeroSection({
     }
   }, [videoSrc])
 
+  // 비디오가 재생 가능해지면 크로스페이드 전환합니다.
+  const handleCanPlay = () => {
+    setVideoReady(true)
+  }
+
   return (
     <section className="relative">
       <div className="relative h-[400px] w-full overflow-hidden sm:h-[500px] md:h-[600px] lg:h-[800px]">
@@ -105,28 +114,37 @@ export function HeroSection({
             priority
             unoptimized
           />
-        ) : shouldLoadVideo && videoSrc ? (
-          <video
-            autoPlay
-            muted
-            loop
-            playsInline
-            // 첫 진입 대역폭 경쟁을 줄이기 위해 동영상은 필요한 시점에만 받습니다.
-            preload="none"
-            poster={posterSrc}
-            className="absolute inset-0 h-full w-full object-cover"
-          >
-            <source src={videoSrc} type="video/mp4" />
-          </video>
         ) : (
-          <Image
-            src={posterSrc}
-            alt=""
-            fill
-            sizes="100vw"
-            className="object-cover"
-            priority
-          />
+          <>
+            {/* 포스터 이미지: 비디오가 완전히 준비될 때까지 계속 표시합니다. */}
+            <Image
+              src={posterSrc}
+              alt=""
+              fill
+              sizes="100vw"
+              className={`object-cover transition-opacity duration-700 ${videoReady ? "opacity-0" : "opacity-100"
+                }`}
+              priority
+            />
+
+            {/* 비디오: 로딩 후 canplay 이벤트 시 페이드인합니다. */}
+            {shouldLoadVideo && videoSrc && (
+              <video
+                ref={videoRef}
+                autoPlay
+                muted
+                loop
+                playsInline
+                // metadata를 먼저 받아 첫 프레임을 빠르게 표시합니다.
+                preload="auto"
+                onCanPlay={handleCanPlay}
+                className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-700 ${videoReady ? "opacity-100" : "opacity-0"
+                  }`}
+              >
+                <source src={videoSrc} type="video/mp4" />
+              </video>
+            )}
+          </>
         )}
 
         <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-black/35 to-black/60">

@@ -19,6 +19,8 @@ const DELIVERY_STATUS_VALUES: DeliveryStatus[] = [
 ]
 
 export const dynamic = "force-dynamic"
+// DB가 ap-southeast-2(Sydney)에 있어 함수 실행 리전도 맞춰 왕복 지연을 줄입니다.
+export const preferredRegion = "syd1"
 
 // Vercel(배포) 환경에서는 Prisma Client 타입 생성/해석 타이밍에 따라
 // `Prisma.OrderWhereInput` 같은 타입 export가 간헐적으로 누락되어 빌드가 깨진 적이 있습니다.

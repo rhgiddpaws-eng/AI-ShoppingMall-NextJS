@@ -13,7 +13,7 @@ function loadCdnUrlFromEnv(): string {
       const m = content.match(/NEXT_PUBLIC_AWS_BUCKET_CDN=(.+)/)
       if (m) return m[1].trim().replace(/^["']|["']$/g, '')
     }
-  } catch (_) {}
+  } catch (_) { }
   return 'https://cdn.ncott.shop'
 }
 
@@ -44,6 +44,20 @@ const nextConfig: NextConfig = {
         pathname: '/**',
       },
     ],
+  },
+  // 정적 에셋(동영상·이미지)의 브라우저/CDN 캐시를 길게 잡아 반복 다운로드를 방지합니다.
+  async headers() {
+    return [
+      {
+        source: '/main/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
+        ],
+      },
+    ]
   },
 }
 

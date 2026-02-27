@@ -6,6 +6,9 @@
 import { NextResponse } from "next/server"
 import { requireAdminSession } from "@/lib/requireAdminSession"
 
+// DB가 ap-southeast-2(Sydney)에 있어 함수 실행 리전도 맞춰 왕복 지연을 줄입니다.
+export const preferredRegion = "syd1"
+
 // 유저 모킹 데이터
 const users = [
   {
