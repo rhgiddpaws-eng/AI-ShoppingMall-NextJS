@@ -29,7 +29,7 @@ function loadCdnBaseFromEnv(): string {
       }
     }
   } catch (_) {}
-  return 'https://cdn.ncott.shop'
+  return 'https://d3s7cl7vzjzoba.cloudfront.net'
 }
 
 function getCdnBase(): string {

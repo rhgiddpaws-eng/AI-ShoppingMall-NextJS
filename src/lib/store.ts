@@ -348,7 +348,7 @@ export async function fetchLogin(email: string, password: string) {
       return {
         ok: false,
         error:
-          '현재 주소는 접근 보호된 배포 URL입니다. ncott.shop 또는 ai-shopping-mall-next-js.vercel.app로 접속해 주세요.',
+          '현재 주소는 접근 보호된 배포 URL입니다. ai-shopping-mall-next-js.vercel.app로 접속해 주세요.',
       } as LoginResponse
     }
     return { ok: false, error: '서버 응답이 올바르지 않습니다.' } as LoginResponse

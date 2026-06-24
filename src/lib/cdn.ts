@@ -1,10 +1,12 @@
 /**
  * CDN 이미지 URL 생성
- * .env의 NEXT_PUBLIC_AWS_BUCKET_CDN (예: https://cdn.ncott.shop) 을 베이스로 사용
+ * .env의 NEXT_PUBLIC_AWS_BUCKET_CDN (예: https://d3s7cl7vzjzoba.cloudfront.net) 을 베이스로 사용.
+ * 구매 도메인이 있을 때(예시): NEXT_PUBLIC_AWS_BUCKET_CDN=https://cdn.ncott.shop
+ * 구매 도메인이 없을 때(기본값): https://d3s7cl7vzjzoba.cloudfront.net
  */
 const CDN_BASE =
   (typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_AWS_BUCKET_CDN) ||
-  'https://cdn.ncott.shop'
+  'https://d3s7cl7vzjzoba.cloudfront.net'
 
 /**
  * 상품 이미지 등 CDN 경로를 풀 URL로 만듦.
@@ -26,6 +28,6 @@ export function getCdnHostname(): string {
   try {
     return new URL(CDN_BASE).hostname
   } catch {
-    return 'cdn.ncott.shop'
+    return 'd3s7cl7vzjzoba.cloudfront.net'
   }
 }

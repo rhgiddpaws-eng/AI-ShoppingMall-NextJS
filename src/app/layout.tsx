@@ -16,7 +16,13 @@ import { ShopProvider } from "@/lib/context/ShopContext"
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" })
 
 // 사이트 공통 메타데이터입니다.
+// metadataBase: OG/canonical 등 절대 URL의 기준 도메인.
+//  - 구매 도메인이 없을 때(현재): Vercel 기본주소를 기본값으로 사용
+//  - 구매 도메인이 있을 때: NEXT_PUBLIC_APP_URL 환경변수에 https://도메인 을 넣으면 그 값을 우선 사용
 export const metadata: Metadata = {
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_APP_URL ?? "https://ai-shopping-mall-next-js.vercel.app",
+  ),
   title: "KUS 스타일 | 온라인 패션 쇼핑몰",
   description: "KUS 스타일에서 최신 트렌드 패션 아이템을 만나보세요.",
   generator: "v0.dev",

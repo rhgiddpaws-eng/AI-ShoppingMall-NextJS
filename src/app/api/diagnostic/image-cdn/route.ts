@@ -44,7 +44,7 @@ export async function GET() {
         fetchOk
           ? '서버에서 CDN 이미지 fetch 성공. Next Image 최적화가 동작할 수 있는 환경입니다.'
           : '서버에서 CDN 이미지 fetch 실패. Next Image가 깨질 수 있습니다. (방화벽/DNS/remotePatterns 확인)',
-      cdnBase: process.env.NEXT_PUBLIC_AWS_BUCKET_CDN ?? 'https://cdn.ncott.shop',
+      cdnBase: process.env.NEXT_PUBLIC_AWS_BUCKET_CDN ?? 'https://d3s7cl7vzjzoba.cloudfront.net',
       sampleKey: image.original,
       sampleUrl,
       fetchStatus,

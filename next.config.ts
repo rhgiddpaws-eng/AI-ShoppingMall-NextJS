@@ -14,7 +14,7 @@ function loadCdnUrlFromEnv(): string {
       if (m) return m[1].trim().replace(/^["']|["']$/g, '')
     }
   } catch (_) { }
-  return 'https://cdn.ncott.shop'
+  return 'https://d3s7cl7vzjzoba.cloudfront.net'
 }
 
 const cdnUrl = loadCdnUrlFromEnv()
@@ -22,7 +22,7 @@ const cdnHostname = (() => {
   try {
     return new URL(cdnUrl).hostname
   } catch {
-    return 'cdn.ncott.shop'
+    return 'd3s7cl7vzjzoba.cloudfront.net'
   }
 })()
 
