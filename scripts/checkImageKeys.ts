@@ -29,7 +29,7 @@ function loadCdnBaseFromEnv(): string {
       }
     }
   } catch (_) {}
-  return 'https://d3s7cl7vzjzoba.cloudfront.net'
+  return 'https://d3rgt12bybxz50.cloudfront.net'
 }
 
 function getCdnBase(): string {
